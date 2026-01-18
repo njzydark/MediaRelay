@@ -1,0 +1,8 @@
+{
+  "embyToAlistPathMap": {
+    "/data/TVShow/": "/115Media/TVShow/",
+    "/data/Anime/": "/115Media/Anime/",
+    "/data/Movie/": "/115Media/Movie/"
+  },
+  "webDirect": true
+}
