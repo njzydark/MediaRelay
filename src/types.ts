@@ -1,3 +1,11 @@
+// deno-lint-ignore-file ban-types
+export type EmbyMediaStreams = {
+  Codec: "h264" | "eac3" | "subrip" | (string & {});
+  Type: "Video" | "Audio" | "Subtitle" | (string & {});
+  Protocol: "File" | "Http";
+  IsDefault: boolean;
+}[];
+
 export type EmbyMediaSources = {
   // mediasource_36868
   Id: string;
@@ -15,6 +23,7 @@ export type EmbyMediaSources = {
   TranscodeReasons?: unknown[];
   Protocol?: "File" | "Http";
   enableDirectPlay?: boolean;
+  MediaStreams: EmbyMediaStreams;
 }[];
 
 export type EmbyItemsApiResponse = {

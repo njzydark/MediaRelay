@@ -1,7 +1,7 @@
 import { getAlistFileRawUrl } from "./alist.ts";
 import config from "../config.json" with { type: "json" };
 import { env } from "./env.ts";
-import { isWebBrowser } from "./utils.ts";
+import { calculateMaxAgeMs, isMediaStreamNotSupportByWeb, isWebBrowser } from "./utils.ts";
 import { directUrlCache, embyItemPathCache, generateDirectUrlCacheKey } from "./cache.ts";
 import { EmbyItemsApiResponse, EmbyMediaSources } from "./types.ts";
 
@@ -34,9 +34,13 @@ export const getOrFetchDirectUrl = (
     try {
       const alistUrl = await getAlistFileRawUrl(path, { ua, ip });
       if (alistUrl) {
-        directUrlCache.set(cacheKey, alistUrl);
+        const urlObj = new URL(alistUrl);
+        const t = urlObj.searchParams.get("t");
+        const bufferTime = 3 * 60 * 1000;
+        const maxAge = calculateMaxAgeMs(t, Date.now() + bufferTime);
+        directUrlCache.set(cacheKey, alistUrl, { maxAge });
         if (!mediaSourceId) {
-          directUrlCache.set(generateDirectUrlCacheKey({ id: itemId, ua }), alistUrl);
+          directUrlCache.set(generateDirectUrlCacheKey({ id: itemId, ua }), alistUrl, { maxAge });
         }
         return alistUrl;
       }
@@ -156,30 +160,21 @@ export const rewritePlaybackInfo = async ({
   const mediaSources = data.MediaSources || [];
 
   const promises = mediaSources.map(async (item) => {
+    if (isMediaStreamNotSupportByWeb({ ua, mediaStreams: item.MediaStreams })) {
+      console.log("Media stream not supported by web");
+      return item;
+    }
     if (item.Path) {
       embyItemPathCache.set(item.Id, item.Path);
     }
-    const directUrl = isWebBrowser(ua)
-      ? await getOrFetchDirectUrl({
-        itemId: item.ItemId,
-        mediaSourceId: item.Id,
-        ua,
-        ip,
-        path: item.Path,
-      })
-      : `${env.embyUrl}/fake_direct_stream_url?ItemId=${item.ItemId}&MediaSourceId=${item.Id}`;
+    const directUrl = `${env.embyUrl}/fake_direct_stream_url?ItemId=${item.ItemId}&MediaSourceId=${item.Id}`;
     if (directUrl) {
       item.TranscodeReasons = [];
       item.SupportsTranscoding = false;
       item.SupportsDirectPlay = true;
       item.Protocol = "Http";
-      if (isWebBrowser(ua)) {
-        item.SupportsDirectStream = false;
-        item.Path = directUrl;
-      } else {
-        item.SupportsDirectStream = true;
-        item.DirectStreamUrl = directUrl;
-      }
+      item.SupportsDirectStream = true;
+      item.DirectStreamUrl = directUrl;
     }
   });
   await Promise.all(promises);
