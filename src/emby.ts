@@ -77,10 +77,15 @@ export const getEmbyFilePathByItemId = async (
     const data: EmbyItemsApiResponse = await response.json();
     console.log("[emby api response]", data);
     const currentItem = data?.Items?.[0];
-    currentItem.MediaSources?.forEach((item) => {
+    const currentItemMediaSources = currentItem.MediaSources || [];
+    currentItemMediaSources.forEach((item) => {
       embyItemPathCache.set(item.Id, item.Path);
     });
-    embyItemPathCache.set(currentItem.Id, currentItem.Path);
+    // 如果 mediaSources 只有一项，直接用其 ItemId 和 Path 设置缓存，避免后续只存在 ItemId 作为缓存 key 获取不到的问题
+    // 且这个 path 不会存在 strm 后缀
+    if (currentItemMediaSources.length === 1) {
+      embyItemPathCache.set(currentItemMediaSources[0].ItemId, currentItemMediaSources[0].Path);
+    }
     const path = embyItemPathCache.get(cacheKey);
     if (path && !path.includes(".strm")) {
       return path;
