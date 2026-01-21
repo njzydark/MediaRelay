@@ -69,11 +69,31 @@ export const handleRewriteStream = async (c: Context) => {
   }
 };
 
+export const handleGenerateM3U = async (c: Context) => {
+  const { itemId, mediaSourceId, ua, headers, ip } = getCommonDataFromRequest(c);
+  const directUrl = await rewriteStream({ itemId, ua, ip, headers, mediaSourceId });
+  if (directUrl) {
+    const m3uContent = `#EXTM3U
+${directUrl}`;
+    return new Response(m3uContent, {
+      headers: {
+        "Content-Type": "application/x-mpegURL",
+        "Content-Disposition": "inline",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } else {
+    return c.notFound()
+  }
+};
+
 export const handleRewriteFakeDirectUrl = (c: Context) => {
   const path = c.req.path;
-  if (path.includes(`/fake_direct_stream_url`)) {
+  if (path.includes(`/fake_direct_stream.m3u`)) {
+    console.log(`[Fake Direct M3U Stream] Handling fake direct stream m3u URL`);
+    return handleGenerateM3U(c);
+  } else if (path.includes(`/fake_direct_stream_url`)) {
     console.log(`[Fake Direct Stream] Handling fake direct stream URL`);
-    console.log(c.req.url);
     return handleRewriteStream(c);
   } else if (path.includes("/embyhttps:/") || path.includes("/embyhttp:/")) {
     const directUrl = path.replace(/^\/emby/, "");
