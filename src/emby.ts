@@ -144,11 +144,12 @@ export const rewriteEmbyIndexHtml = (
   return html;
 };
 
-export const rewritePlaybackInfo = async ({
+export const rewritePlaybackInfo = ({
   itemId,
   ua,
   ip,
   data,
+  origin,
 }: {
   itemId: string;
   ua: string;
@@ -157,6 +158,7 @@ export const rewritePlaybackInfo = async ({
     PlaySessionId: string;
     MediaSources: EmbyMediaSources;
   };
+  origin: string;
 }) => {
   if (isWebBrowser(ua) && !webDirect) {
     return data;
@@ -164,15 +166,16 @@ export const rewritePlaybackInfo = async ({
 
   const mediaSources = data.MediaSources || [];
 
-  const promises = mediaSources.map(async (item) => {
+  mediaSources.forEach((item) => {
     if (isMediaStreamNotSupportByWeb({ ua, mediaStreams: item.MediaStreams })) {
       console.log("Media stream not supported by web");
-      return item;
+      return;
     }
     if (item.Path) {
       embyItemPathCache.set(item.Id, item.Path);
     }
-    const directUrl = `${env.embyUrl}/fake_direct_stream_url?ItemId=${item.ItemId}&MediaSourceId=${item.Id}`;
+    const directUrl = `${origin}/emby/fake_direct_stream_url?ItemId=${item.ItemId}&MediaSourceId=${item.Id}`;
+    console.log(`[Direct Stream URL] ${directUrl}`);
     if (directUrl) {
       item.TranscodeReasons = [];
       item.SupportsTranscoding = false;
@@ -182,7 +185,6 @@ export const rewritePlaybackInfo = async ({
       item.DirectStreamUrl = directUrl;
     }
   });
-  await Promise.all(promises);
 
   if (mediaSources.length === 1) {
     embyItemPathCache.set(itemId, mediaSources[0].Path);

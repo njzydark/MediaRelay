@@ -15,7 +15,7 @@ export const handleRewriteIndexHtml = async (c: Context) => {
 };
 
 export const handleRewritePlaybackInfo = async (c: Context) => {
-  const { ua, itemId, ip } = getCommonDataFromRequest(c);
+  const { ua, itemId, ip, origin } = getCommonDataFromRequest(c);
 
   const response = await generateProxyRequest(c);
 
@@ -27,11 +27,12 @@ export const handleRewritePlaybackInfo = async (c: Context) => {
   }
 
   const data = await response.json();
-  const newData = await rewritePlaybackInfo({
+  const newData = rewritePlaybackInfo({
     itemId,
     ua,
     ip,
     data,
+    origin,
   });
 
   return new Response(JSON.stringify(newData), {
@@ -48,6 +49,7 @@ export const handleRewriteStream = async (c: Context) => {
   console.time(timeFlag);
   const url = await rewriteStream({ itemId, ua, ip, headers, mediaSourceId });
   console.timeEnd(timeFlag);
+  console.log("ua", ua);
   console.log(`[direct stram]: ${url}`);
 
   if (url) {

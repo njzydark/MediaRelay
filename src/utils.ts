@@ -32,9 +32,15 @@ export function isWebBrowser(ua: string): boolean {
 export function getCommonDataFromRequest(c: Context) {
   const itemId = c.req.param("itemId") || c.req.query("ItemId") || "";
   const mediaSourceId = c.req.query("MediaSourceId");
+
   const ua = c.req.header("user-agent") || "";
   const headers = c.req.header();
-  const ip = c.req.header("x-forwarded-for") || c.req.header("x-real-ip");
+  const ip = c.req.header("x-real-ip") || c.req.header("x-forwarded-for");
+
+  const url = new URL(c.req.url);
+  const protocol = c.req.header("x-forwarded-proto") || url.protocol.replace(":", "");
+  const host = c.req.header("x-forwarded-host") || c.req.header("host") || url.host;
+  const origin = `${protocol}://${host}`;
 
   return {
     itemId,
@@ -42,6 +48,7 @@ export function getCommonDataFromRequest(c: Context) {
     ua,
     headers,
     ip,
+    origin,
   };
 }
 
