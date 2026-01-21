@@ -4,5 +4,30 @@
     "/data/Anime/": "/115Media/Anime/",
     "/data/Movie/": "/115Media/Movie/"
   },
-  "webDirect": true
+  "webDirect": true,
+  "externalPlayer": {
+    "enabled": true,
+    "common": [
+      { "name": "VLC", "scheme": "vlc://$url", "icon": "vlc" }
+    ],
+    "platforms": {
+      "windows": [
+        { "name": "PotPlayer", "scheme": "potplayer://$url", "icon": "potplayer" }
+      ],
+      "macos": [
+        { "name": "SenPlayer", "scheme": "SenPlayer://x-callback-url/play?url=$encUrl", "icon": "senplayer" },
+        { "name": "IINA", "scheme": "iina://weblink?url=$encUrl&mpv_sub-files-append=$sub&mpv-command=show-text,hello-world", "icon": "iina" }
+      ],
+      "android": [
+        {
+          "name": "MXPlayer",
+          "scheme": "intent:$url#Intent;package=com.mxtech.videoplayer.ad;S.title=$title;end",
+          "icon": "mxplayer"
+        }
+      ],
+      "ios": [
+        { "name": "Infuse", "scheme": "infuse://address?url=$url", "icon": "infuse" }
+      ]
+    }
+  }
 }

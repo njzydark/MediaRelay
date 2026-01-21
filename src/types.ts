@@ -33,3 +33,56 @@ export type EmbyItemsApiResponse = {
     MediaSources?: EmbyMediaSources;
   }[];
 };
+
+export type EmbyUserItemApiResponse = {
+  Name: string;
+  Id: string;
+  CanDelete: boolean;
+  CanDownload: boolean;
+  SupportsSync: boolean;
+  SortName: string;
+  ForcedSortName: string;
+  ExternalUrls: { Name: string; Url: string }[];
+  Path: string;
+  RunTimeTicks: number;
+  FileName: string;
+  ProviderIds: Record<string, string>;
+  IsFolder: boolean;
+  Type: "Series" | "Season" | "Episode";
+  UserData: {
+    PlaybackPositionTicks: number;
+    IsFavorite: boolean;
+    Played: boolean;
+  };
+  ChildCount?: number;
+  IndexNumber?: number;
+  ParentIndexNumber?: number;
+  ParentId?: string;
+  SeriesName?: string;
+  SeriesId?: string;
+  SeasonId?: string;
+  SeasonName?: string;
+};
+
+export type EmbyNextUpEpisodesApiResponse = {
+  TotalRecordCount: number;
+  Items: (Omit<EmbyUserItemApiResponse, "Type"> & {
+    Type: "Episode";
+  })[];
+};
+
+export type ExternalPlayerConfig = {
+  enabled: boolean;
+  common?: {
+    name: string;
+    scheme: string;
+    icon?: string;
+  }[];
+  platforms: {
+    [key: string]: {
+      name: string;
+      scheme: string;
+      icon?: string;
+    }[];
+  };
+};

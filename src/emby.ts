@@ -5,7 +5,7 @@ import { calculateMaxAgeMs, isMediaStreamNotSupportByWeb, isWebBrowser } from ".
 import { directUrlCache, embyItemPathCache, generateDirectUrlCacheKey } from "./cache.ts";
 import { EmbyItemsApiResponse, EmbyMediaSources } from "./types.ts";
 
-const { webDirect } = config;
+const { webDirect, externalPlayer } = config;
 
 const fetchDirectUrlPromiseMap = new Map<string, Promise<string | undefined>>();
 
@@ -104,17 +104,11 @@ export const rewriteEmbyIndexHtml = (
     return html;
   }
 
-  const newMeta = '<meta name="referrer" content="no-referrer">';
-  if (html.includes('name="referrer"')) {
-    html = html.replace(/<meta name="referrer" content=".*?">/, newMeta);
-  } else {
-    html = html.replace("<head>", `<head>${newMeta}`);
-  }
-
-  const bypassScript = `
+  if (externalPlayer?.enabled) {
+    const scripts = `
     <script>
       (function() {
-        // 第一阶段：全局禁用 HTMLVideoElement 的 crossOrigin 属性
+       // 第一阶段：全局禁用 HTMLVideoElement 的 crossOrigin 属性
         Object.defineProperty(HTMLVideoElement.prototype, 'crossOrigin', {
           set: function() { console.log('[Bypass] Blocked Emby from setting crossorigin'); },
           get: function() { return null; }
@@ -136,10 +130,117 @@ export const rewriteEmbyIndexHtml = (
         document.head.appendChild(meta);
 
         console.log('[Success] Emby Video CORS Protection Disabled.');
+
+        window.EXTERNAL_PLAYER_CONFIG = ${JSON.stringify(externalPlayer)};
+
+        const PLAYER_ICONS = {
+          vlc: '<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><path fill="#FF8800" d="M24 4L6 38h36L24 4z"/><path fill="#FFF" d="M24 14l-9 17h18l-9-17z"/><path fill="#FF8800" d="M4 40h40v4H4v-4z"/></svg>',
+          potplayer: '<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="20" fill="#FFC107"/><path d="M18 14v20l16-10z" fill="#FFF"/></svg>',
+          iina: '<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" x="4" y="4" rx="8" fill="#1A1A1A"/><path d="M16 12v24l20-12z" fill="#FFF"/></svg>',
+          infuse: '<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><path d="M24 4C13 4 4 13 4 24s9 20 20 20 20-9 20-20S35 4 24 4zm10 21l-14 8V17l14 8z" fill="#E91E63"/></svg>',
+          senplayer: '<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" x="4" y="4" rx="8" fill="#5E5CE6"/><path d="M18 14v20l16-10z" fill="#FFF"/></svg>',
+          mxplayer: '<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><path d="M24 4C13 4 4 13 4 24s9 20 20 20 20-9 20-20S35 4 24 4zm-4 30V14l12 10-12 10z" fill="#2196F3"/></svg>',
+          default: '<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><path d="M24 4C13 4 4 13 4 24s9 20 20 20 20-9 20-20S35 4 24 4zm-4 30V14l12 10-12 10z" fill="#888"/></svg>'
+        };
+
+        function getPlatform() {
+          const ua = navigator.userAgent.toLowerCase();
+          if (ua.includes('win')) return 'windows';
+          if (ua.includes('mac')) return 'macos';
+          if (ua.includes('android')) return 'android';
+          if (ua.includes('iphone') || ua.includes('ipad')) return 'ios';
+          return 'linux';
+        }
+
+        async function getPlayableItem(itemId) {
+          const apiClient = window.ApiClient;
+          if (!apiClient) return null;
+          const userId = apiClient.getCurrentUserId();
+          const item = await apiClient.getItem(userId, itemId);
+          
+          if (item.Type === 'Series') {
+            const nextUp = await apiClient.getNextUpEpisodes({ SeriesId: itemId, UserId: userId, Limit: 1 });
+            if (nextUp.Items && nextUp.Items.length > 0) return nextUp.Items[0];
+            const episodes = await apiClient.getItems(userId, { ParentId: itemId, Limit: 1, Recursive: true, IncludeItemTypes: 'Episode' });
+            return episodes.Items?.[0];
+          } 
+          if (item.Type === 'Season') {
+            const episodes = await apiClient.getEpisodes(item.SeriesId, { SeasonId: itemId, UserId: userId });
+            return episodes.Items?.[0];
+          }
+          return item;
+        }
+
+        function injectButtons(container, playableItem) {
+          if (!container) return;
+
+          const group = document.createElement('div');
+          group.className = 'btnExternalPlayerGroup verticalFieldItem detailButtons mainDetailButtons flex align-items-flex-start flex-wrap-wrap focuscontainer-x detail-lineItem detailButtons-margin focusable';
+
+          const platform = getPlatform();
+          const commonPlayers = window.EXTERNAL_PLAYER_CONFIG.common || [];
+          const platformPlayers = window.EXTERNAL_PLAYER_CONFIG.platforms[platform] || [];
+          const players = [...commonPlayers, ...platformPlayers];
+
+          players.forEach(player => {
+            const btn = document.createElement('button');
+            btn.className = 'btnResume raised detailButton emby-button button-hoverable detailButton-primary';
+            btn.type = 'button';
+            btn.title = player.name;
+            
+            const iconKey = (player.icon || player.name).toLowerCase();
+            const iconSvg = PLAYER_ICONS[iconKey] || PLAYER_ICONS.default;
+            
+            btn.innerHTML = \`
+              <div style="display:flex;align-items:center;gap:0.4em;">
+                <div style="width:20px;height:20px;display:flex;align-items:center;">\${iconSvg}</div>
+                <span class="buttonText">\${player.name}</span>
+              </div>
+            \`;
+
+            btn.onclick = () => {
+              const itemId = playableItem.Id;
+              const title = (playableItem.SeriesName ? (playableItem.SeriesName + ' - ' + playableItem.Name) : playableItem.Name) || 'Video';
+              
+              const videoUrl = window.location.origin + '/emby/fake_direct_stream_url?ItemId=' + itemId;
+
+              const finalUrl = player.scheme
+                .replace('$url', videoUrl)
+                .replace('$encUrl', encodeURIComponent(videoUrl))
+                .replace('$title', encodeURIComponent(title));
+              console.log('[ExternalPlayer] Opening:', finalUrl);
+              window.location.href = finalUrl;
+            };
+            group.appendChild(btn);
+          });
+
+         container.appendChild(group);
+        }
+
+        window.addEventListener('viewshow', async function(e) {
+        console.log('[njzy debug]',e)
+          if (e.detail.path === '/item') {
+            const itemId = e.detail.params.id;
+            const playableItem = await getPlayableItem(itemId);
+            console.log('[njzy debug]', playableItem);
+            if (!playableItem) return;
+            const playbackInfo = await ApiClient.getPlaybackInfo(playableItem.Id);
+            console.log('[njzy debug]', playbackInfo);
+
+            const container = e.detail.view;
+            const tryInject = () => {
+              if (container) {
+                injectButtons(container, playableItem);
+              }
+            };
+           tryInject()
+          }
+        });
       })();
     </script>
     `;
-  html = html.replace("<head>", "<head>" + bypassScript);
+    html = html.replace("<head>", "<head>" + scripts);
+  }
 
   return html;
 };
