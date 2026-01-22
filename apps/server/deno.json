@@ -1,0 +1,10 @@
+{
+  "name": "@app/server",
+  "version": "0.1.0",
+  "exports": "./main.ts",
+  "tasks": {
+    "dev": "deno task build:emby-scripts && deno run -A --env --watch main.ts",
+    "compile": "deno task build:emby-scripts && deno compile -A --output ./emby2openlist main.ts",
+    "build:emby-scripts": "deno task --cwd ../../packages/emby build:scripts"
+  }
+}

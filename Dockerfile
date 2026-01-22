@@ -8,5 +8,5 @@ RUN deno task compile
 # Production stage
 FROM alpine:latest
 WORKDIR /app
-COPY --from=builder /app/emby2openlist .
+COPY --from=builder /app/apps/server/emby2openlist .
 CMD ["./emby2openlist"]

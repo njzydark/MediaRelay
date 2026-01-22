@@ -1,0 +1,22 @@
+{
+  "mediaPathToStoragePathMap": {
+    "/data/TVShow/": "/115Media/TVShow/",
+    "/data/Anime/": "/115Media/Anime/",
+    "/data/Movie/": "/115Media/Movie/"
+  },
+  "webDirect": true,
+  "externalPlayer": {
+    "enabled": true,
+    "platforms": {
+      "windows": [
+        { "name": "PotPlayer", "scheme": "potplayer://$url" }
+      ],
+      "macos": [
+        {
+          "name": "IINA",
+          "scheme": "iina://weblink?url=$url&mpv_cmd_sub-add=$sub&mpv_force-media-title=$title"
+        }
+      ]
+    }
+  }
+}

@@ -1,12 +1,17 @@
 // deno-lint-ignore-file ban-types
-export type EmbyMediaStreams = {
-  Codec: "h264" | "eac3" | "subrip" | (string & {});
+export type MediaStreams = {
+  Codec: "h264" | "eac3" | "subrip" | "ass" | (string & {});
   Type: "Video" | "Audio" | "Subtitle" | (string & {});
   Protocol: "File" | "Http";
   IsDefault: boolean;
+  IsExternal: boolean;
+  DisplayTitle: string;
+  SupportsExternalStream: boolean;
+  Path: string;
+  Index: number;
 }[];
 
-export type EmbyMediaSources = {
+export type MediaSources = {
   // mediasource_36868
   Id: string;
   // 36868
@@ -23,18 +28,18 @@ export type EmbyMediaSources = {
   TranscodeReasons?: unknown[];
   Protocol?: "File" | "Http";
   enableDirectPlay?: boolean;
-  MediaStreams: EmbyMediaStreams;
+  MediaStreams: MediaStreams;
 }[];
 
-export type EmbyItemsApiResponse = {
+export type ItemsApiResponse = {
   Items: {
     Id: string;
     Path: string;
-    MediaSources?: EmbyMediaSources;
+    MediaSources?: MediaSources;
   }[];
 };
 
-export type EmbyUserItemApiResponse = {
+export type UserItem = {
   Name: string;
   Id: string;
   CanDelete: boolean;
@@ -49,6 +54,8 @@ export type EmbyUserItemApiResponse = {
   ProviderIds: Record<string, string>;
   IsFolder: boolean;
   Type: "Series" | "Season" | "Episode";
+  MediaSources?: MediaSources;
+  MediaStreams?: MediaStreams;
   UserData: {
     PlaybackPositionTicks: number;
     IsFavorite: boolean;
@@ -64,25 +71,7 @@ export type EmbyUserItemApiResponse = {
   SeasonName?: string;
 };
 
-export type EmbyNextUpEpisodesApiResponse = {
+export type UserItemsApiResponse = {
   TotalRecordCount: number;
-  Items: (Omit<EmbyUserItemApiResponse, "Type"> & {
-    Type: "Episode";
-  })[];
-};
-
-export type ExternalPlayerConfig = {
-  enabled: boolean;
-  common?: {
-    name: string;
-    scheme: string;
-    icon?: string;
-  }[];
-  platforms: {
-    [key: string]: {
-      name: string;
-      scheme: string;
-      icon?: string;
-    }[];
-  };
+  Items: UserItem[];
 };

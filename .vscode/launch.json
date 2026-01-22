@@ -3,17 +3,18 @@
   "configurations": [
     {
       "request": "launch",
-      "name": "proxy",
+      "name": "app-server",
       "type": "node",
-      "program": "${workspaceFolder}/src/index.ts",
-      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/apps/server/main.ts",
+      "cwd": "${workspaceFolder}/apps/server",
       "env": {},
       "runtimeExecutable": "${userHome}/.deno/bin/deno",
       "runtimeArgs": [
         "run",
         "--env-file",
         "--inspect-wait",
-        "--allow-all"
+        "--allow-all",
+        "--unstable-raw-imports"
       ],
       "attachSimplePort": 9229
     }

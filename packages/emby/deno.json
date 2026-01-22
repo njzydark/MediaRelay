@@ -1,0 +1,9 @@
+{
+  "name": "@lib/emby",
+  "version": "0.1.0",
+  "exports": "./mod.ts",
+  "tasks": {
+    "dev:scripts": "deno run -A npm:@rslib/core build --watch",
+    "build:scripts": "deno run -A npm:@rslib/core build"
+  }
+}
