@@ -14,7 +14,7 @@
       "macos": [
         {
           "name": "IINA",
-          "scheme": "iina://weblink?url=$url&mpv_cmd_sub-add=$sub&mpv_force-media-title=$title"
+          "scheme": "iina://weblink?url=$url&mpv_cmd_sub-add=$sub&mpv_force-media-title=$title&mpv_start=$start"
         }
       ]
     }

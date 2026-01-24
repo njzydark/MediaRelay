@@ -3,6 +3,8 @@
 
 import type { UserItem } from "../types.ts";
 
+import { playbackPositionTicksToSeconds } from "@lib/shared";
+
 const PLAYER_ICONS: Record<string, string> = {
   vlc: "https://images.videolan.org/images/favicon.ico",
   potplayer: "https://t1.daumcdn.net/potplayer/main/img/favicon.ico",
@@ -70,7 +72,8 @@ async function injectButtons(container: HTMLElement, playableItem: UserItem) {
   const firstAvailableApiKey =
     apiKeys.Items.find((key) => key.IsActive === true && key.Type === "ApiKey")?.AccessToken || "";
 
-  const { ParentIndexNumber = -1, IndexNumber = -1, MediaStreams, Id, SeriesName, SeasonName, Name } = playableItem;
+  const { ParentIndexNumber = -1, IndexNumber = -1, MediaStreams, Id, SeriesName, SeasonName, Name, UserData } =
+    playableItem;
   const mediaSourceId = `mediasource_${Id}`;
   const firstSubtitleStream = MediaStreams?.find((item) =>
     item.SupportsExternalStream === true && item.Type === "Subtitle"
@@ -86,7 +89,10 @@ async function injectButtons(container: HTMLElement, playableItem: UserItem) {
   const subUrl = typeof firstSubtitleStream?.Index === "number"
     ? `${globalThis.location.origin}/emby/Videos/${Id}/${mediaSourceId}/Subtitles/${firstSubtitleStream?.Index}/Stream.${firstSubtitleStream?.Codec}?api_key=${firstAvailableApiKey}`
     : "";
-  console.log({ title, videoUrl, subUrl });
+  ``;
+  const playbackPositionTicks = UserData?.PlaybackPositionTicks || 0;
+  const startSeconds = playbackPositionTicksToSeconds(playbackPositionTicks);
+  console.log({ title, videoUrl, subUrl, startSeconds });
 
   players.forEach((player) => {
     const btn = document.createElement("button");
@@ -114,7 +120,8 @@ async function injectButtons(container: HTMLElement, playableItem: UserItem) {
       const finalUrl = player.scheme
         .replace("$url", encodeURIComponent(videoUrl))
         .replace("$title", encodeURIComponent(title))
-        .replace("$sub", encodeURIComponent(subUrl));
+        .replace("$sub", encodeURIComponent(subUrl))
+        .replace("$start", startSeconds);
       console.log("[ExternalPlayer] Opening:", finalUrl);
       globalThis.location.href = finalUrl;
     };

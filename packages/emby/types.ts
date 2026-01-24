@@ -56,7 +56,7 @@ export type UserItem = {
   Type: "Series" | "Season" | "Episode";
   MediaSources?: MediaSources;
   MediaStreams?: MediaStreams;
-  UserData: {
+  UserData?: {
     PlaybackPositionTicks: number;
     IsFavorite: boolean;
     Played: boolean;

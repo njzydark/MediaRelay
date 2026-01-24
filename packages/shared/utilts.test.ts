@@ -1,7 +1,7 @@
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { FakeTime } from "@std/testing/time";
-import { calculateMaxAgeMs, getCommonDataFromRequest, isWebBrowser } from "./utils.ts";
+import { calculateMaxAgeMs, getCommonDataFromRequest, isWebBrowser, playbackPositionTicksToSeconds } from "./utils.ts";
 
 describe("isWebBrowser", () => {
   it("common web browsers", () => {
@@ -96,5 +96,22 @@ describe("getCommonDataFromRequest", () => {
     expect(commonData.ua).toBe("");
     expect(commonData.ip).toBe("");
     expect(commonData.origin).toBe("http://example.com:4433");
+  });
+});
+
+describe("playbackPositionTicksToSeconds", () => {
+  it("basic", () => {
+    expect(playbackPositionTicksToSeconds(10_000_000)).toBe("1");
+    expect(playbackPositionTicksToSeconds(0)).toBe("0");
+    expect(playbackPositionTicksToSeconds(1_359_000)).toBe("0.135");
+    expect(playbackPositionTicksToSeconds(1_354_000)).toBe("0.135");
+  });
+
+  it("custom fraction digits", () => {
+    // 0.0019 seconds = 19,000 ticks
+    const ticks = 19000;
+    expect(playbackPositionTicksToSeconds(ticks)).toBe("0.001");
+    expect(playbackPositionTicksToSeconds(ticks, { fractionDigits: 2 })).toBe("0");
+    expect(playbackPositionTicksToSeconds(ticks, { fractionDigits: 4 })).toBe("0.0019");
   });
 });

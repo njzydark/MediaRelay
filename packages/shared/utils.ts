@@ -58,3 +58,24 @@ export function getCommonDataFromRequest(req: Request) {
     headers,
   };
 }
+
+export function playbackPositionTicksToSeconds(ticks: number, options?: {
+  /**
+   * @default 3
+   */
+  fractionDigits?: number;
+}): string {
+  const fractionDigits = options?.fractionDigits ?? 3;
+
+  if (typeof ticks !== "number" || isNaN(ticks)) {
+    return "0";
+  }
+
+  const precision = Math.pow(10, fractionDigits);
+  const ticksPerSecond = 10_000_000;
+
+  // Calculate seconds with high precision, then floor at the desired decimal place
+  const seconds = Math.floor((ticks * precision) / ticksPerSecond) / precision;
+  const formattedSeconds = Number(seconds.toFixed(fractionDigits));
+  return Number.isNaN(formattedSeconds) ? "0" : formattedSeconds.toString();
+}
