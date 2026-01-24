@@ -83,7 +83,7 @@ async function injectButtons(container: HTMLElement, playableItem: UserItem) {
   if (ParentIndexNumber >= 0 && IndexNumber >= 0) {
     titleIndex = `S${ParentIndexNumber}:E${IndexNumber}`;
   }
-  const title = [SeriesName, SeasonName, Name, titleIndex].filter(Boolean).join(" - ") ||
+  const title = [SeriesName, SeasonName, Name, titleIndex].filter(Boolean).join(" ") ||
     "Video";
   const videoUrl = `${globalThis.location.origin}/emby/fake_direct_stream_url?ItemId=${Id}`;
   const subUrl = typeof firstSubtitleStream?.Index === "number"
