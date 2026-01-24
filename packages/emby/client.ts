@@ -112,7 +112,7 @@ export class EmbyClient implements MediaServer {
 
     if (path === "/") {
       return "redirectIndexHtml";
-    } else if (path === "/" || path === "/web/index.html") {
+    } else if (path === "/web/index.html") {
       return "rewriteHtml";
     } else if (/(emby\/)?Items\/\d+\/PlaybackInfo\/?/.test(path)) {
       return "rewritePlaybackInfo";
@@ -157,10 +157,10 @@ export class EmbyClient implements MediaServer {
 
     const mediaSources = data.MediaSources || [];
 
-    mediaSources.forEach((item) => {
+    for (const item of mediaSources) {
       if (this.isMediaStreamNotSupportByWeb({ ua, mediaStreams: item.MediaStreams })) {
         console.log("Media stream not supported by web");
-        return;
+        continue;
       }
       if (item.Path) {
         this.cache?.set(item.Id, item.Path);
@@ -175,7 +175,7 @@ export class EmbyClient implements MediaServer {
         item.SupportsDirectStream = true;
         item.DirectStreamUrl = directUrl;
       }
-    });
+    }
 
     if (mediaSources.length === 1) {
       this.cache?.set(mediaSources[0].ItemId, mediaSources[0].Path);
@@ -201,17 +201,7 @@ export class EmbyClient implements MediaServer {
   };
 
   redirectDirectUrl: redirectDirectUrlFn = async (req) => {
-    const { url } = this.getCommonDataFromRequest(req);
-    const path = url.pathname;
-    if (path.includes(`/fake_direct_stream_url`)) {
-      console.log(`[Fake Direct Stream] Handling fake direct stream URL`);
-      return await this.rewriteStream(req);
-    } else if (path.includes("/embyhttps:/") || path.includes("/embyhttp:/")) {
-      const directUrl = path.replace(/^\/emby/, "");
-      console.warn(`[Fake Direct URL] ${directUrl}`);
-      return directUrl;
-    } else {
-      return null;
-    }
+    console.log(`[Fake Direct Stream] Handling fake direct stream URL`);
+    return await this.rewriteStream(req);
   };
 }
