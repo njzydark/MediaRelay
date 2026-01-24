@@ -25,12 +25,12 @@ export function isWebBrowser(ua: string): boolean {
   return hasBrowserFeatures && !isApp;
 }
 
-export function calculateMaxAgeMs(t: any, n = Date.now()): number {
-  if (t === null || t === undefined || t === "") return 0;
+export function calculateMaxAgeMs(t: any, n = Date.now()) {
+  if (t === null || t === undefined || t === "") return;
 
   const timestamp = Number(t);
 
-  if (isNaN(timestamp) || timestamp <= 0) return 0;
+  if (isNaN(timestamp) || timestamp < 0) return;
 
   const isMilliseconds = timestamp > 100000000000;
   const targetTsMs = isMilliseconds ? timestamp : timestamp * 1000;

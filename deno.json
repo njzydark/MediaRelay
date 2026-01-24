@@ -7,7 +7,7 @@
   "tasks": {
     "dev": "deno task --cwd apps/server dev",
     "compile": "deno task --cwd apps/server compile",
-    "test": "deno test -A --parallel",
+    "test": "deno test -A --parallel --quiet",
     "lint": "deno lint",
     "fmt": "deno fmt"
   },

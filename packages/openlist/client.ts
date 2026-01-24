@@ -28,6 +28,14 @@ export class OpenlistClient implements StorageProvider {
     this.cache = cacheEnabled ? new QuickLRU<string, string>({ maxSize: 500, maxAge }) : null;
   }
 
+  get baseUrl() {
+    return this.config.url;
+  }
+
+  resetCache() {
+    this.cache?.clear();
+  }
+
   transformAlistFilePath = (_path: string) => {
     let path = decodeURIComponent(_path);
     Object.entries(this.config.pathMap || {}).forEach(([mediaServerPath, openListPath]) => {
@@ -36,12 +44,23 @@ export class OpenlistClient implements StorageProvider {
     return path;
   };
 
+  fsGetApi = (path: string, ua: string, ip?: string) => {
+    return fetch(`${this.config.url}/api/fs/get`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": this.config.token,
+        "User-Agent": ua,
+        ...(ip ? { "X-Forwarded-For": ip } : {}),
+      },
+      body: JSON.stringify({ path: this.transformAlistFilePath(path) }),
+    });
+  };
+
   getDirectUrl: getDirectUrlFn = (path, options) => {
     if (!path) return null;
 
     const cacheKey = `${path}:${options.ua}`;
-
-    console.log("hit cachekey", cacheKey);
     const cache = this.cache?.get(cacheKey);
     if (cache) {
       console.log("hit cache to get direct url");
@@ -55,17 +74,7 @@ export class OpenlistClient implements StorageProvider {
 
     const fetchDirectUrlPromise: Promise<string | null> = (async () => {
       try {
-        const response = await fetch(`${this.config.url}/api/fs/get`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": this.config.token,
-            "User-Agent": options.ua,
-            ...(options?.ip ? { "X-Forwarded-For": options.ip } : {}),
-          },
-          body: JSON.stringify({ path: this.transformAlistFilePath(path) }),
-        });
-
+        const response = await this.fsGetApi(this.transformAlistFilePath(path), options.ua, options.ip);
         const data = await response.json();
         console.log("Openlist API response:", data);
 
