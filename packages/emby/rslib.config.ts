@@ -7,6 +7,11 @@ export default defineConfig({
       "external-player": "./scripts/external-player.ts",
     },
   },
+  resolve: {
+    alias: {
+      "@lib/shared": "../shared/mod.ts",
+    },
+  },
   output: {
     target: "web",
   },

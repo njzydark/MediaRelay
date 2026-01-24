@@ -3,7 +3,12 @@
 
 import type { UserItem } from "../types.ts";
 
-import { playbackPositionTicksToSeconds } from "@lib/shared";
+import {
+  getExternalPlayers,
+  getPlatform,
+  playbackPositionTicksToSeconds,
+  transformExternalPlayerScheme,
+} from "@lib/shared";
 
 const PLAYER_ICONS: Record<string, string> = {
   vlc: "https://images.videolan.org/images/favicon.ico",
@@ -13,15 +18,6 @@ const PLAYER_ICONS: Record<string, string> = {
 };
 
 const isUrlIcon = (icon: string) => icon?.startsWith("http") || icon?.startsWith("/") || icon?.startsWith("data:image");
-
-function getPlatform() {
-  const ua = navigator.userAgent.toLowerCase();
-  if (ua.includes("win")) return "windows";
-  if (ua.includes("mac")) return "macos";
-  if (ua.includes("android")) return "android";
-  if (ua.includes("iphone") || ua.includes("ipad")) return "ios";
-  return "linux";
-}
 
 async function getPlayableItem(itemId: string) {
   const apiClient = globalThis.ApiClient;
@@ -63,10 +59,7 @@ async function injectButtons(container: HTMLElement, playableItem: UserItem) {
     "btnExternalPlayerGroup verticalFieldItem detailButtons mainDetailButtons flex align-items-flex-start flex-wrap-wrap focuscontainer-x detail-lineItem detailButtons-margin focusable";
 
   const platform = getPlatform();
-  const EXTERNAL_PLAYER_CONFIG = globalThis.EXTERNAL_PLAYER_CONFIG;
-  const commonPlayers = EXTERNAL_PLAYER_CONFIG?.common || [];
-  const platformPlayers = EXTERNAL_PLAYER_CONFIG?.platforms?.[platform] || [];
-  const players = [...commonPlayers, ...platformPlayers];
+  const players = getExternalPlayers(globalThis.EXTERNAL_PLAYER_CONFIG, platform);
 
   const apiKeys = await globalThis.ApiClient.getApiKeys();
   const firstAvailableApiKey =
@@ -112,16 +105,17 @@ async function injectButtons(container: HTMLElement, playableItem: UserItem) {
   <div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;">
     ${iconHtml}
   </div>
-  <span class="buttonText">${player.name}</span>
+  ${iconHtml && player.iconOnly ? "" : `<span class="buttonText">${player.name}</span>`}
 </div>
 `;
 
     btn.onclick = () => {
-      const finalUrl = player.scheme
-        .replace("$url", encodeURIComponent(videoUrl))
-        .replace("$title", encodeURIComponent(title))
-        .replace("$sub", encodeURIComponent(subUrl))
-        .replace("$start", startSeconds);
+      const finalUrl = transformExternalPlayerScheme(player.scheme, {
+        videoUrl,
+        title,
+        subUrl,
+        startSeconds,
+      });
       console.log("[ExternalPlayer] Opening:", finalUrl);
       globalThis.location.href = finalUrl;
     };

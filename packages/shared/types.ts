@@ -1,19 +1,22 @@
 export interface ExternalPlayer {
-  name: string;
+  name:
+    | "vlc"
+    | "iina"
+    | "potplayer"
+    | (string & {});
   scheme: string;
   icon?: string;
+  iconOnly?: boolean;
 }
 
 export interface ExternalPlayerConfig {
   enabled: boolean;
   common?: ExternalPlayer[];
-  platforms?: {
-    windows?: ExternalPlayer[];
-    macos?: ExternalPlayer[];
-    android?: ExternalPlayer[];
-    ios?: ExternalPlayer[];
-    linux?: ExternalPlayer[];
-  };
+  windows?: ExternalPlayer[];
+  macos?: ExternalPlayer[];
+  android?: ExternalPlayer[];
+  ios?: ExternalPlayer[];
+  linux?: ExternalPlayer[];
 }
 
 export abstract class StorageProvider {

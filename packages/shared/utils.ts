@@ -25,6 +25,25 @@ export function isWebBrowser(ua: string): boolean {
   return hasBrowserFeatures && !isApp;
 }
 
+export function getPlatform() {
+  const ua = globalThis?.navigator?.userAgent?.toLowerCase();
+
+  if (ua.includes("android")) return "android";
+  if (ua.includes("iphone")) return "ios";
+
+  // @ts-ignore: maxTouchPoints is not recognized
+  const maxTouchPoints = globalThis?.navigator?.maxTouchPoints || 0;
+  const isIpad = ua.includes("ipad") || (ua.includes("macintosh") && maxTouchPoints > 1);
+  if (isIpad) return "ios";
+
+  if (ua.includes("macintosh") || ua.includes("mac os x")) return "macos";
+  if (ua.includes("windows") || ua.includes("win32")) return "windows";
+
+  if (ua.includes("linux")) return "linux";
+
+  return "unknown";
+}
+
 export function calculateMaxAgeMs(t: any, n = Date.now()) {
   if (t === null || t === undefined || t === "") return;
 

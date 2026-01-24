@@ -6,17 +6,6 @@
   },
   "webDirect": true,
   "externalPlayer": {
-    "enabled": true,
-    "platforms": {
-      "windows": [
-        { "name": "PotPlayer", "scheme": "potplayer://$url" }
-      ],
-      "macos": [
-        {
-          "name": "IINA",
-          "scheme": "iina://weblink?url=$url&mpv_cmd_sub-add=$sub&mpv_force-media-title=$title&mpv_start=$start"
-        }
-      ]
-    }
+    "enabled": true
   }
 }
