@@ -16,6 +16,7 @@
         "--allow-all",
         "--unstable-raw-imports"
       ],
+      "preLaunchTask": "emby-scripts",
       "attachSimplePort": 9229
     }
   ]

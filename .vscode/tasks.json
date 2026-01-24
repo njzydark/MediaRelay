@@ -1,0 +1,35 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "deno",
+			"command": "task",
+			"args": [
+				"-c",
+				"packages/emby/deno.json",
+				"dev:scripts"
+			],
+			"problemMatcher": {
+				"pattern": {
+					"regexp": "build failed",
+					"file": 1,
+					"line": 2,
+					"column": 3,
+					"severity": 4,
+					"message": 5
+				},
+				"background": {
+					"beginsPattern": {
+						"regexp": "build started"
+					},
+					"endsPattern": {
+						"regexp": "build completed, watching for changes"
+					}
+				}
+			},
+			"isBackground": true,
+			"label": "emby-scripts",
+			"detail": "$ deno run -A npm:@rslib/core build --watch"
+		}
+	]
+}

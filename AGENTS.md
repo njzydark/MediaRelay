@@ -1,107 +1,71 @@
-# Agent Guidelines for emby2openlist
+# Developer Guidelines for Emby2Openlist
 
-This document provides essential information for agentic coding tools operating in this repository.
+This document outlines the development standards, commands, and conventions for the Emby2Openlist codebase. This project is a Deno-based monorepo.
 
-## Project Overview
+## 1. Toolchain & Commands
 
-`emby2openlist` is a Deno-based proxy service that redirects Emby media library playback links to Alist direct links
-(specifically for 115 Cloud). It aims to solve bandwidth issues when accessing Emby libraries over the public internet.
+This project uses **Deno** for runtime, testing, linting, and formatting.
 
-- **Runtime**: [Deno](https://deno.com/) (>= 2.6.x)
-- **Framework**: [Hono](https://hono.dev/)
-- **Entry Point**: `src/index.ts`
+### Core Commands
+- **Dev Server**: `deno task dev` (Starts the server in `apps/server`)
+- **Compile**: `deno task compile` (Compiles the server to a binary)
+- **Format Code**: `deno task fmt` (Runs `deno fmt`)
+- **Lint Code**: `deno task lint` (Runs `deno lint`)
+- **Run Tests**: `deno task test` (Runs all tests in parallel)
 
-## Command Reference
+### Running Specific Tests
+To run a specific test file or test case, use the standard Deno test flags:
+```bash
+# Run a specific test file
+deno test -A packages/shared/utils.test.ts
 
-### Development & Build
+# Run a specific test case by name (regex)
+deno test -A --filter "my test case" packages/shared/utils.test.ts
+```
 
-- **Start Development**: `deno task start`
-  - Runs with `--watch`, `--allow-net`, `--allow-read`, `--allow-env`, and loads `.env` automatically.
-- **Lint Code**: `deno task lint`
-  - Note: `no-explicit-any` and `no-unused-vars` are currently excluded from linting rules.
-- **Format Code**: `deno fmt`
-- **Compile to Binary**: `deno task compile`
-  - Outputs an `emby2openlist` executable.
+## 2. Project Structure
 
-### Testing
+The project follows a monorepo structure:
+- **`apps/server`**: The main application entry point (Hono server).
+- **`packages/`**: Shared libraries and specific integrations.
+  - **`shared`**: Common utilities, types, and interfaces (`@lib/shared`).
+  - **`emby`**: Emby integration logic and client (`@lib/emby`).
+  - **`openlist`**: Openlist/Alist integration (`@lib/openlist`).
 
-- **Run All Tests**: `deno task test`
-  - Requires `--allow-net`.
-- **Run Single Test File**: `deno test --allow-net src/path/to/file.test.ts`
-- **Run with Watch Mode**: `deno test --watch src/path/to/file.test.ts`
+## 3. Code Style & Conventions
 
-## Code Style & Guidelines
-
-### 1. Imports
-
-- **Extensions**: Always include the `.ts` extension for relative imports (e.g., `import { foo } from "./utils.ts";`).
-- **Standard Library**: Prefer using JSR or JSR-aliased imports in `deno.json`.
-- **JSON**: Use the `with { type: "json" }` attribute for JSON imports.
-  ```typescript
-  import config from "../config.json" with { type: "json" };
-  ```
-
-### 2. Formatting
-
+### Formatting
 - **Indentation**: 2 spaces.
 - **Line Width**: 120 characters.
-- **Semicolons**: Always use semicolons.
-- **Quotes**: Double quotes for strings.
-- **Trailing Commas**: Use trailing commas in multi-line objects and arrays.
+- **Quotes**: Double quotes (`"`).
+- **Semicolons**: Always use semicolons (`true`).
+- **Enforcement**: Run `deno task fmt` to automatically fix formatting.
 
-### 3. Naming Conventions
+### Naming Conventions
+- **Files**: Kebab-case (e.g., `external-player.ts`, `video-cors.ts`).
+- **Classes**: PascalCase (e.g., `EmbyClient`, `MediaServer`).
+- **Functions/Variables**: camelCase (e.g., `bootstrap`, `calculateMaxAgeMs`).
+- **Interfaces/Types**: PascalCase (e.g., `EmbyConfig`, `ItemsApiResponse`).
 
-- **Variables & Functions**: `camelCase` (e.g., `handleRewritePlaybackInfo`, `itemId`).
-- **Types & Interfaces**: `PascalCase` (e.g., `ApiResponse`, `ProxyConfig`).
-- **Environment Variables**: `SNAKE_CASE` (e.g., `EMBY_URL`, `ALIST_TOKEN`).
-- **Files**: `kebab-case.ts` (e.g., `cache.test.ts`, `handler.ts`).
+### TypeScript
+- **Strictness**: Types should be explicit. Avoid `any` unless absolutely necessary (though `no-explicit-any` is currently excluded in lint rules, prefer strict types).
+- **Interfaces**: Define interfaces for API responses and configuration objects.
+- **Imports**:
+  - Use mapped imports defined in `deno.json` for internal packages (e.g., `import { ... } from "@lib/shared";`).
+  - Use `jsr:` or `npm:` prefixes for external dependencies as defined in `deno.json` imports.
 
-### 4. Types
+### Error Handling
+- Use `try...catch` blocks for external API calls and async operations.
+- Log errors using `console.error` with descriptive messages.
+- Fail gracefully or return `null`/default values where appropriate to prevent server crashes.
 
-- **Strict Typing**: Leverage TypeScript to define clear interfaces for API responses and internal data structures.
-- **Avoid `any`**: While the linter allows it, try to avoid `any` and define proper types/interfaces.
-- **JSR Packages**: Prefer `@std` packages for standard utilities (expect, testing, dotenv).
+### Logging
+- Use `console.log` for general info and `console.error` for errors.
+- The Hono logger middleware is also enabled in the main server application.
 
-### 5. Error Handling
+## 4. Architecture & Patterns
 
-- **Try-Catch**: Use `try...catch` blocks for network requests and external API interactions.
-- **Logging**: Use `console.error` for errors and `console.log`/`console.time` for performance monitoring/debugging.
-- **Graceful Degradation**: If an Alist direct link cannot be fetched, fall back to the original Emby stream or proxy
-  the request.
-
-### 6. Framework Specifics (Hono)
-
-- Use `Context` (typed as `c: Context`) for handling requests/responses in route handlers.
-- Use `logger()` middleware for important routes.
-- Implement handlers as exported constants in `src/handler.ts`.
-
-## Project Structure
-
-- `src/index.ts`: Application entry point and route definitions.
-- `src/handler.ts`: Route handler implementations.
-- `src/emby.ts`: Logic specific to Emby metadata and playback info rewriting.
-- `src/alist.ts`: Integration with Alist API.
-- `src/proxy.ts`: Generic proxy request generation logic.
-- `src/utils.ts`: Shared utility functions.
-- `src/types.ts`: Global type definitions.
-- `src/cache.ts`: Caching mechanism for direct links.
-
-## Testing Guidelines
-
-- **BDD Style**: Use `@std/testing/bdd` for `describe`, `it`, `beforeEach`.
-- **Assertions**: Use `@std/expect`.
-- **Mocks**: Use `FakeTime` from `@std/testing/time` for testing time-sensitive logic like caches.
-- **Naming**: Test files should be named `<module>.test.ts` and reside in the same directory as the module they test.
-
-## Environment Variables
-
-Ensure the following variables are defined in `.env` or the environment:
-
-- `EMBY_URL`: Address of the Emby server.
-- `ALIST_URL`: Address of the Alist server.
-- `ALIST_TOKEN`: Alist API token.
-- `PORT`: (Optional) Port to run the service on (default: 3000).
-
----
-
-_Note: This file is intended for agentic consumption. Adhere to these rules when proposing or making changes._
+- **Dependency Injection**: Configuration is typically passed into class constructors (e.g., `new EmbyClient(config)`).
+- **Interfaces**: The `MediaServer` interface in `@lib/shared` defines the contract for media server integrations.
+- **Hono**: The server uses Hono for routing and middleware.
+- **Environment**: Configuration is loaded from environment variables/config files via `loadConfig()` in `apps/server/config.ts`.
