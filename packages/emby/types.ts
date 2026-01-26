@@ -29,6 +29,7 @@ export type MediaSources = {
   Protocol?: "File" | "Http";
   enableDirectPlay?: boolean;
   MediaStreams: MediaStreams;
+  DefaultSubtitleStreamIndex?: number;
 }[];
 
 export type ItemsApiResponse = {

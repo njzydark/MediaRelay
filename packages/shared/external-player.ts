@@ -16,7 +16,7 @@ export const defaultPlatformPlayers: Omit<ExternalPlayerConfig, "enabled"> = {
   macos: [
     {
       name: "IINA",
-      scheme: "iina://weblink?url=$url&mpv_cmd_sub-add=$sub&mpv_force-media-title=$title&mpv_start=$start",
+      scheme: "iina://weblink?url=$url&mpv_force-media-title=$title&$start&$sub",
       iconOnly: true,
     },
   ],
@@ -34,13 +34,31 @@ export function getExternalPlayers(config: ExternalPlayerConfig | undefined, _pl
 export function transformExternalPlayerScheme(scheme: string, options: {
   videoUrl: string;
   title?: string;
-  subUrl?: string;
+  allSubtitles?: {
+    url: string;
+    title: string;
+    isDefault: boolean;
+  }[];
   startSeconds?: string | number;
 }) {
-  const { videoUrl, title, subUrl, startSeconds } = options;
+  const { videoUrl, title, startSeconds: _startSeconds, allSubtitles = [] } = options;
+
+  let subUrl = encodeURIComponent(allSubtitles?.[0]?.url) || "";
+  let startSeconds = _startSeconds || 0;
+
+  if (scheme.startsWith("iina://")) {
+    // iina 兼容多同名 key 参数后才能直接用 allSubtitles，目前先用第一个
+    const subParams = (allSubtitles.length ? [allSubtitles[0]] : []).map((sub, index) => {
+      return encodeURIComponent(JSON.stringify([sub.url, index === 0 ? "select" : "auto", sub.title]));
+    }).join(`&mpv_cmd_sub-add=`);
+    subUrl = subParams ? `mpv_cmd_sub-add=${subParams}` : "";
+    console.log("subUrl", subUrl);
+    startSeconds = `mpv_cmd_seek=${encodeURIComponent(JSON.stringify([String(startSeconds), "absolute"]))}`;
+  }
+
   const vars: Record<string, string | number | undefined | null> = {
-    "$url": videoUrl,
-    "$title": title,
+    "$url": encodeURIComponent(videoUrl),
+    "$title": encodeURIComponent(title || ""),
     "$sub": subUrl,
     "$start": startSeconds,
   };
@@ -57,7 +75,7 @@ export function transformExternalPlayerScheme(scheme: string, options: {
         .replace(new RegExp(`\\?[^&?]*\\${key}`, "g"), "")
         .replace(key, "");
     } else {
-      result = result.replaceAll(key, encodeURIComponent(String(value)));
+      result = result.replaceAll(key, String(value));
     }
   }
 

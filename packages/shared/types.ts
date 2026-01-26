@@ -1,3 +1,4 @@
+// deno-lint-ignore-file ban-types
 export interface ExternalPlayer {
   name:
     | "vlc"

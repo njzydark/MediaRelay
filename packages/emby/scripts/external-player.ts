@@ -65,12 +65,28 @@ async function injectButtons(container: HTMLElement, playableItem: UserItem) {
   const firstAvailableApiKey =
     apiKeys.Items.find((key) => key.IsActive === true && key.Type === "ApiKey")?.AccessToken || "";
 
-  const { ParentIndexNumber = -1, IndexNumber = -1, MediaStreams, Id, SeriesName, SeasonName, Name, UserData } =
-    playableItem;
+  const { ParentIndexNumber = -1, IndexNumber = -1, Id, SeriesName, SeasonName, Name, UserData } = playableItem;
   const mediaSourceId = `mediasource_${Id}`;
-  const firstSubtitleStream = MediaStreams?.find((item) =>
-    item.SupportsExternalStream === true && item.Type === "Subtitle"
-  );
+  const currentMediaSource = playableItem.MediaSources?.find((item) => item.Id === mediaSourceId);
+  const allSubtitles = currentMediaSource?.MediaStreams?.reduce(
+    (acc, item) => {
+      if (item.IsExternal === true && item.SupportsExternalStream === true && item.Type === "Subtitle") {
+        const url =
+          `${globalThis.location.origin}/emby/Videos/${Id}/${mediaSourceId}/Subtitles/${item.Index}/Stream.${item.Codec}?api_key=${firstAvailableApiKey}`;
+        acc.push({
+          url,
+          title: item.DisplayTitle || "",
+          isDefault: item.IsDefault || item.Index === currentMediaSource.DefaultSubtitleStreamIndex,
+        });
+      }
+      return acc;
+    },
+    [] as ({
+      url: string;
+      title: string;
+      isDefault: boolean;
+    })[],
+  )?.sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
 
   let titleIndex = "";
   if (ParentIndexNumber >= 0 && IndexNumber >= 0) {
@@ -79,13 +95,9 @@ async function injectButtons(container: HTMLElement, playableItem: UserItem) {
   const title = [SeriesName, SeasonName, Name, titleIndex].filter(Boolean).join(" ") ||
     "Video";
   const videoUrl = `${globalThis.location.origin}/emby/fake_direct_stream_url?ItemId=${Id}`;
-  const subUrl = typeof firstSubtitleStream?.Index === "number"
-    ? `${globalThis.location.origin}/emby/Videos/${Id}/${mediaSourceId}/Subtitles/${firstSubtitleStream?.Index}/Stream.${firstSubtitleStream?.Codec}?api_key=${firstAvailableApiKey}`
-    : "";
-  ``;
   const playbackPositionTicks = UserData?.PlaybackPositionTicks || 0;
   const startSeconds = playbackPositionTicksToSeconds(playbackPositionTicks);
-  console.log({ title, videoUrl, subUrl, startSeconds });
+  console.log({ title, videoUrl, allSubtitles, startSeconds });
 
   players.forEach((player) => {
     const btn = document.createElement("button");
@@ -113,7 +125,7 @@ async function injectButtons(container: HTMLElement, playableItem: UserItem) {
       const finalUrl = transformExternalPlayerScheme(player.scheme, {
         videoUrl,
         title,
-        subUrl,
+        allSubtitles,
         startSeconds,
       });
       console.log("[ExternalPlayer] Opening:", finalUrl);
