@@ -109,6 +109,7 @@ export class EmbyClient implements MediaServer {
   identifyProxyAction: identifyProxyActionFn = (req) => {
     const url = new URL(req.url);
     const path = url.pathname;
+    const search = url.search;
 
     if (path === "/") {
       return "redirectIndexHtml";
@@ -118,7 +119,7 @@ export class EmbyClient implements MediaServer {
       return "rewritePlaybackInfo";
     } else if (/(emby\/)?Videos\/\d+\/stream\/?/.test(path)) {
       return "rewriteStream";
-    } else if (path.includes("/fake_direct_stream_url")) {
+    } else if (search.includes("FakeDirectStream")) {
       return "redirectDirectUrl";
     } else {
       return "direct";
@@ -165,7 +166,8 @@ export class EmbyClient implements MediaServer {
       if (item.Path) {
         this.cache?.set(item.Id, item.Path);
       }
-      const directUrl = `${origin}/emby/fake_direct_stream_url?ItemId=${item.ItemId}&MediaSourceId=${item.Id}`;
+      const directUrl =
+        `${origin}/Videos/${item.ItemId}/stream?MediaSourceId=${item.Id}&Static=true&FakeDirectStream=true`;
       console.log(`[Direct Stream URL] ${directUrl}`);
       if (directUrl) {
         item.TranscodeReasons = [];

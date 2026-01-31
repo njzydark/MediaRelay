@@ -94,7 +94,8 @@ async function injectButtons(container: HTMLElement, playableItem: UserItem) {
   }
   const title = [SeriesName, SeasonName, Name, titleIndex].filter(Boolean).join(" ") ||
     "Video";
-  const videoUrl = `${globalThis.location.origin}/emby/fake_direct_stream_url?ItemId=${Id}`;
+  const videoUrl =
+    `${globalThis.location.origin}/Videos/${Id}/stream?MediaSourceId=${mediaSourceId}&Static=true&FakeDirectStream=true`;
   const playbackPositionTicks = UserData?.PlaybackPositionTicks || 0;
   const startSeconds = playbackPositionTicksToSeconds(playbackPositionTicks);
   console.log({ title, videoUrl, allSubtitles, startSeconds });
