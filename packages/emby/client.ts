@@ -52,7 +52,10 @@ export class EmbyClient implements MediaServer {
     const itemId = (basic.url.pathname.match(/\/?(Items|Videos)\/(\d+)\//)?.[2]) ||
       basic.url.searchParams.get("ItemId") || "";
     const mediaSourceId = basic.url.searchParams.get("MediaSourceId");
-    return { ...basic, itemId, mediaSourceId };
+    const finalItemId = String(
+      mediaSourceId?.startsWith("mediasource_") ? mediaSourceId.replace("mediasource_", "") : itemId,
+    );
+    return { ...basic, itemId: finalItemId, mediaSourceId };
   };
 
   isMediaStreamNotSupportByWeb = ({ ua, mediaStreams }: { ua: string; mediaStreams: MediaStreams }) => {
@@ -66,8 +69,7 @@ export class EmbyClient implements MediaServer {
   getMediaSourcePath: getMediaSourcePathFn = async (req) => {
     const { itemId, headers, mediaSourceId } = this.getCommonDataFromRequest(req);
 
-    const cacheKey = String(mediaSourceId || itemId);
-    const cache = this.cache?.get(cacheKey);
+    const cache = this.cache?.get(itemId);
     if (cache) {
       console.log("hit cache to get item path");
       return cache;

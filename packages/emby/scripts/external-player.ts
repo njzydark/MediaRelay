@@ -66,39 +66,6 @@ async function injectButtons(container: HTMLElement, playableItem: UserItem) {
     apiKeys.Items.find((key) => key.IsActive === true && key.Type === "ApiKey")?.AccessToken || "";
 
   const { ParentIndexNumber = -1, IndexNumber = -1, Id, SeriesName, SeasonName, Name, UserData } = playableItem;
-  const mediaSourceId = `mediasource_${Id}`;
-  const currentMediaSource = playableItem.MediaSources?.find((item) => item.Id === mediaSourceId);
-  const allSubtitles = currentMediaSource?.MediaStreams?.reduce(
-    (acc, item) => {
-      if (item.IsExternal === true && item.SupportsExternalStream === true && item.Type === "Subtitle") {
-        const url =
-          `${globalThis.location.origin}/emby/Videos/${Id}/${mediaSourceId}/Subtitles/${item.Index}/Stream.${item.Codec}?api_key=${firstAvailableApiKey}`;
-        acc.push({
-          url,
-          title: item.DisplayTitle || "",
-          isDefault: item.IsDefault || item.Index === currentMediaSource.DefaultSubtitleStreamIndex,
-        });
-      }
-      return acc;
-    },
-    [] as ({
-      url: string;
-      title: string;
-      isDefault: boolean;
-    })[],
-  )?.sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
-
-  let titleIndex = "";
-  if (ParentIndexNumber >= 0 && IndexNumber >= 0) {
-    titleIndex = `S${ParentIndexNumber}:E${IndexNumber}`;
-  }
-  const title = [SeriesName, SeasonName, Name, titleIndex].filter(Boolean).join(" ") ||
-    "Video";
-  const videoUrl =
-    `${globalThis.location.origin}/Videos/${Id}/stream?MediaSourceId=${mediaSourceId}&Static=true&FakeDirectStream=true`;
-  const playbackPositionTicks = UserData?.PlaybackPositionTicks || 0;
-  const startSeconds = playbackPositionTicksToSeconds(playbackPositionTicks);
-  console.log({ title, videoUrl, allSubtitles, startSeconds });
 
   players.forEach((player) => {
     const btn = document.createElement("button");
@@ -123,6 +90,48 @@ async function injectButtons(container: HTMLElement, playableItem: UserItem) {
 `;
 
     btn.onclick = () => {
+      const mediaSourceSelectEl: HTMLSelectElement | null = container.querySelector("select.selectSource");
+      const mediaSourceSelectValue = mediaSourceSelectEl?.value;
+      const mediaSourceId = mediaSourceSelectValue || `mediasource_${Id}`;
+      const currentMediaSource = playableItem.MediaSources?.find((item) => item.Id === mediaSourceId);
+
+      const subtitlesSelectEl: HTMLSelectElement | null = container.querySelector("select.selectSubtitles");
+      const subtitlesSelecctValue = subtitlesSelectEl?.value;
+      const allSubtitles = currentMediaSource?.MediaStreams?.reduce(
+        (acc, item) => {
+          if (item.IsExternal === true && item.SupportsExternalStream === true && item.Type === "Subtitle") {
+            const url =
+              `${globalThis.location.origin}/emby/Videos/${Id}/${mediaSourceId}/Subtitles/${item.Index}/Stream.${item.Codec}?api_key=${firstAvailableApiKey}`;
+            acc.push({
+              url,
+              title: item.DisplayTitle || "",
+              Index: item.Index,
+              isDefault: item.Index?.toString() === subtitlesSelecctValue || item.IsDefault ||
+                item.Index === currentMediaSource.DefaultSubtitleStreamIndex,
+            });
+          }
+          return acc;
+        },
+        [] as ({
+          url: string;
+          title: string;
+          Index: number;
+          isDefault: boolean;
+        })[],
+      )?.sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
+
+      let titleIndex = "";
+      if (ParentIndexNumber >= 0 && IndexNumber >= 0) {
+        titleIndex = `S${ParentIndexNumber}:E${IndexNumber}`;
+      }
+      const title = [SeriesName, SeasonName, Name, titleIndex].filter(Boolean).join(" ") ||
+        "Video";
+      const videoUrl =
+        `${globalThis.location.origin}/Videos/${Id}/stream?MediaSourceId=${mediaSourceId}&Static=true&FakeDirectStream=true`;
+      const playbackPositionTicks = UserData?.PlaybackPositionTicks || 0;
+      const startSeconds = playbackPositionTicksToSeconds(playbackPositionTicks);
+      console.log({ title, videoUrl, allSubtitles, startSeconds, mediaSourceSelectValue, subtitlesSelecctValue });
+
       const finalUrl = transformExternalPlayerScheme(player.scheme, {
         videoUrl,
         title,
