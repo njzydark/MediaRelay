@@ -3,7 +3,7 @@ import { calculateMaxAgeMs } from "@lib/shared";
 import QuickLRU from "quick-lru";
 
 export interface OpenlistConfig {
-  url: string;
+  baseUrl: string;
   token: string;
   pathMap?: Record<string, string>;
   cache?: {
@@ -29,7 +29,7 @@ export class OpenlistClient implements StorageProvider {
   }
 
   get baseUrl() {
-    return this.config.url;
+    return this.config.baseUrl;
   }
 
   resetCache() {
@@ -45,7 +45,7 @@ export class OpenlistClient implements StorageProvider {
   };
 
   fsGetApi = (path: string, ua: string, ip?: string) => {
-    return fetch(`${this.config.url}/api/fs/get`, {
+    return fetch(`${this.config.baseUrl}/api/fs/get`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

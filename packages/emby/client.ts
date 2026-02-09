@@ -17,7 +17,7 @@ import videoCorsScript from "./dist/video-cros.js" with { type: "text" };
 import externalPlayer from "./dist/external-player.js" with { type: "text" };
 
 export interface EmbyConfig {
-  url: string;
+  baseUrl: string;
   apiKey: string;
   webDirect?: boolean;
   externalPlayer?: ExternalPlayerConfig;
@@ -44,7 +44,7 @@ export class EmbyClient implements MediaServer {
   }
 
   get baseUrl(): string {
-    return this.config.url;
+    return this.config.baseUrl;
   }
 
   getCommonDataFromRequest = (req: Request) => {
@@ -77,7 +77,7 @@ export class EmbyClient implements MediaServer {
 
     try {
       const response = await fetch(
-        `${this.config.url}/emby/Items?Fields=Path,MediaSources&Ids=${itemId}&api_key=${this.config.apiKey}`,
+        `${this.config.baseUrl}/emby/Items?Fields=Path,MediaSources&Ids=${itemId}&api_key=${this.config.apiKey}`,
         {
           headers,
         },

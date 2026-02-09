@@ -7,7 +7,7 @@ import { OpenlistClient } from "./client.ts";
 
 describe("OpenlistClient", () => {
   const client = new OpenlistClient({
-    url: "https://example.com",
+    baseUrl: "https://example.com",
     token: "test-token",
     pathMap: {
       "/media/": "/openlist-media/",
@@ -101,7 +101,7 @@ describe("OpenlistClient", () => {
 
   it("disabled cache works", async () => {
     const noCacheClient = new OpenlistClient({
-      url: "https://example.com",
+      baseUrl: "https://example.com",
       token: "test-token",
       cache: {
         enabled: false,

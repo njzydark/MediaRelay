@@ -1,24 +1,25 @@
 import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { cors } from "hono/cors";
-import { loadConfig } from "./config.ts";
+import { configService } from "./config.ts";
 import { EmbyClient } from "@lib/emby";
 import { OpenlistClient } from "@lib/openlist";
 import type { MediaServer } from "@lib/shared";
 import { generateProxyRequest } from "./proxy.ts";
 
 async function bootstrap() {
-  const config = await loadConfig();
+  await configService.init();
+  const config = configService.config;
 
-  const storage = new OpenlistClient({
-    url: config.alistUrl,
-    token: config.alistToken,
-    pathMap: config.mediaPathToStoragePathMap,
-  });
+  if (!config) {
+    Deno.exit(1);
+  }
+
+  const storage = new OpenlistClient(config.openlist);
 
   const emby = new EmbyClient({
-    url: config.embyUrl,
-    apiKey: config.embyApiKey,
+    baseUrl: config.emby?.baseUrl || "",
+    apiKey: config.emby?.apiKey || "",
     webDirect: config.webDirect,
     externalPlayer: config.externalPlayer,
     getDirectUrl: storage.getDirectUrl,
@@ -117,7 +118,7 @@ async function bootstrap() {
       url.pathname.endsWith("/embywebsocket")
     ) {
       const { socket: clientWs, response } = Deno.upgradeWebSocket(request);
-      const backendUrl = config.embyUrl.replace(/^http/, "ws") + url.pathname + url.search;
+      const backendUrl = mediaServer.baseUrl.replace(/^http/, "ws") + url.pathname + url.search;
       const backendWs = new WebSocket(backendUrl);
 
       clientWs.onopen = () => {
