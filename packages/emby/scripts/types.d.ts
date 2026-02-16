@@ -1,6 +1,6 @@
 // deno-lint-ignore-file ban-types
 import type { ExternalPlayerConfig } from "@lib/shared";
-import type { UserItem, UserItemsApiResponse } from "../types.ts";
+import type { User, UserItem, UserItemsApiResponse } from "../types.ts";
 
 declare global {
   interface EmbyItem {
@@ -18,6 +18,11 @@ declare global {
   }
 
   interface ApiClientInstance {
+    _userAuthInfo: {
+      UserId: string;
+      AccessToken: string;
+    };
+    getUser(userId: string): Promise<User>;
     getCurrentUserId(): string;
     getItem(userId: string, itemId: string): Promise<UserItem>;
     getItems(userId: string, options: Record<string, any>): Promise<UserItemsApiResponse>;

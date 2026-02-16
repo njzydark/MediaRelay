@@ -61,10 +61,6 @@ async function injectButtons(container: HTMLElement, playableItem: UserItem) {
   const platform = getPlatform();
   const players = getExternalPlayers(globalThis.EXTERNAL_PLAYER_CONFIG, platform);
 
-  const apiKeys = await globalThis.ApiClient.getApiKeys();
-  const firstAvailableApiKey =
-    apiKeys.Items.find((key) => key.IsActive === true && key.Type === "ApiKey")?.AccessToken || "";
-
   const { ParentIndexNumber = -1, IndexNumber = -1, Id, SeriesName, SeasonName, Name, UserData } = playableItem;
 
   players.forEach((player) => {
@@ -101,7 +97,7 @@ async function injectButtons(container: HTMLElement, playableItem: UserItem) {
         (acc, item) => {
           if (item.IsExternal === true && item.SupportsExternalStream === true && item.Type === "Subtitle") {
             const url =
-              `${globalThis.location.origin}/emby/Videos/${Id}/${mediaSourceId}/Subtitles/${item.Index}/Stream.${item.Codec}?api_key=${firstAvailableApiKey}`;
+              `${globalThis.location.origin}/emby/Videos/${Id}/${mediaSourceId}/Subtitles/${item.Index}/Stream.${item.Codec}?X-Emby-Token=${globalThis.ApiClient._userAuthInfo.AccessToken}`;
             acc.push({
               url,
               title: item.DisplayTitle || "",
@@ -127,7 +123,7 @@ async function injectButtons(container: HTMLElement, playableItem: UserItem) {
       const title = [SeriesName, SeasonName, Name, titleIndex].filter(Boolean).join(" ") ||
         "Video";
       const videoUrl =
-        `${globalThis.location.origin}/Videos/${Id}/stream?MediaSourceId=${mediaSourceId}&Static=true&FakeDirectStream=true`;
+        `${globalThis.location.origin}/Videos/${Id}/stream?MediaSourceId=${mediaSourceId}&Static=true&FakeDirectStream=true&X-Emby-Token=${globalThis.ApiClient._userAuthInfo.AccessToken}`;
       const playbackPositionTicks = UserData?.PlaybackPositionTicks || 0;
       const startSeconds = playbackPositionTicksToSeconds(playbackPositionTicks);
       console.log({ title, videoUrl, allSubtitles, startSeconds, mediaSourceSelectValue, subtitlesSelecctValue });

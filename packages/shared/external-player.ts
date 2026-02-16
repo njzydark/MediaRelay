@@ -22,6 +22,10 @@ export const defaultPlatformPlayers: Omit<ExternalPlayerConfig, "enabled"> = {
   ],
 };
 
+export const getDefaultPlayers = () => {
+  return { common: defaultCommonPlayers, ...defaultPlatformPlayers };
+};
+
 export function getExternalPlayers(config: ExternalPlayerConfig | undefined, _platform: string) {
   if (!config || !config.enabled) return [];
 

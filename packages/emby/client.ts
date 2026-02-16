@@ -2,26 +2,29 @@ import type {
   ExternalPlayerConfig,
   getDirectUrlFn,
   getMediaSourcePathFn,
+  getUserInfoFn,
   identifyProxyActionFn,
+  Injection,
+  Logger,
   MediaServer,
   redirectDirectUrlFn,
   redirectIndexHtmlFn,
   rewriteHtmlFn,
   rewritePlaybackInfoFn,
   rewriteStreamFn,
+  ServerConfigChangeCallback,
 } from "@lib/shared";
 import QuickLRU from "quick-lru";
 import { getCommonDataFromRequest, isWebBrowser } from "@lib/shared";
-import type { ItemsApiResponse, MediaSources, MediaStreams } from "./types.ts";
-import videoCorsScript from "./dist/video-cros.js" with { type: "text" };
-import externalPlayer from "./dist/external-player.js" with { type: "text" };
+import type { ItemsApiResponse, MediaSources, MediaStreams, User } from "./types.ts";
 
 export interface EmbyConfig {
   baseUrl: string;
-  apiKey: string;
   webDirect?: boolean;
+  webDirectLocalFallback?: boolean;
   externalPlayer?: ExternalPlayerConfig;
   getDirectUrl: getDirectUrlFn;
+  injections?: Injection[];
   cache?: {
     /**
      * @default true
@@ -32,20 +35,39 @@ export interface EmbyConfig {
      */
     maxAge?: number;
   };
+  logger?: Logger;
 }
 
 export class EmbyClient implements MediaServer {
   cache: QuickLRU<string, string> | null;
+  type = "emby";
+  private logger: Logger | null = null;
 
   constructor(private config: EmbyConfig) {
     const cacheEnabled = this.config.cache?.enabled ?? true;
     const maxAge = this.config.cache?.maxAge ?? 3600 * 1000;
     this.cache = cacheEnabled ? new QuickLRU<string, string>({ maxSize: 500, maxAge }) : null;
+    this.logger = config.logger || null;
+  }
+
+  private log(level: keyof Logger, message: string, details?: string) {
+    this.logger?.[level](`[EmbyClient] ${message}`, details);
   }
 
   get baseUrl(): string {
     return this.config.baseUrl;
   }
+
+  onServerConfigChange: ServerConfigChangeCallback = (serverConfig) => {
+    this.config = {
+      ...this.config,
+      webDirect: serverConfig.webDirect,
+      webDirectLocalFallback: serverConfig.webDirectLocalFallback,
+      externalPlayer: serverConfig.externalPlayer,
+      injections: serverConfig.injections,
+    };
+    this.log("info", "Configuration updated successfully");
+  };
 
   getCommonDataFromRequest = (req: Request) => {
     const basic = getCommonDataFromRequest(req);
@@ -55,55 +77,104 @@ export class EmbyClient implements MediaServer {
     const finalItemId = String(
       mediaSourceId?.startsWith("mediasource_") ? mediaSourceId.replace("mediasource_", "") : itemId,
     );
-    return { ...basic, itemId: finalItemId, mediaSourceId };
+    const token = basic.url.searchParams.get("X-Emby-Token");
+    const apiKey = basic.url.searchParams.get("api_key");
+    return { ...basic, itemId: finalItemId, mediaSourceId, token, apiKey };
   };
 
   isMediaStreamNotSupportByWeb = ({ ua, mediaStreams }: { ua: string; mediaStreams: MediaStreams }) => {
-    if (isWebBrowser(ua)) {
-      return mediaStreams?.some((item) => {
+    if (this.config.webDirectLocalFallback && isWebBrowser(ua)) {
+      const res = mediaStreams?.some((item) => {
         return item.Type === "Audio" && item.IsDefault && item.Codec === "eac3";
       });
+      if (res) {
+        this.log(
+          "info",
+          "Rewrite skipped: stream not support by web",
+          JSON.stringify({ ua, mediaStreams }),
+        );
+      }
+      return res;
+    }
+  };
+
+  getUserInfo: getUserInfoFn = async (req, { userId, token, apiKey }) => {
+    if (!userId) {
+      this.log("warn", "getUserInfo called with empty userId");
+      return null;
+    }
+    this.log("trace", "Fetching user info", `userId: ${userId}`);
+    const { headers } = this.getCommonDataFromRequest(req);
+    try {
+      const response = await fetch(
+        `${this.config.baseUrl}/emby/Users/${userId}?${
+          apiKey ? `api_key=${apiKey}` : token ? `X-Emby-Token=${token}` : ``
+        }`,
+        {
+          headers,
+        },
+      );
+      const data: User = await response.json();
+      this.log("trace", "User info fetched", `name: ${data.Name}, isAdmin: ${data.Policy.IsAdministrator}`);
+      return {
+        isAdmin: data.Policy.IsAdministrator,
+        name: data.Name,
+        id: data.Id,
+      };
+    } catch (err: any) {
+      this.log("error", "Error fetching user info", err.message);
+      return null;
     }
   };
 
   getMediaSourcePath: getMediaSourcePathFn = async (req) => {
-    const { itemId, headers, mediaSourceId } = this.getCommonDataFromRequest(req);
+    const { itemId, headers, mediaSourceId, token, apiKey } = this.getCommonDataFromRequest(req);
+
+    this.log("debug", "Getting media source path", `itemId: ${itemId}, mediaSourceId: ${mediaSourceId}`);
 
     const cache = this.cache?.get(itemId);
     if (cache) {
-      console.log("hit cache to get item path");
-      return cache;
+      this.log("info", "Media path cache hit", `${itemId} -> ${decodeURIComponent(cache)}`);
+      return { Path: cache };
     }
 
     try {
       const response = await fetch(
-        `${this.config.baseUrl}/emby/Items?Fields=Path,MediaSources&Ids=${itemId}&api_key=${this.config.apiKey}`,
+        `${this.config.baseUrl}/emby/Items?Fields=Path,MediaSources&Ids=${itemId}&${
+          apiKey ? `api_key=${apiKey}` : token ? `X-Emby-Token=${token}` : ``
+        }`,
         {
           headers,
         },
       );
       const data: ItemsApiResponse = await response.json();
-      console.log("[emby api response]", data);
+
       const currentItem = data?.Items?.[0];
       const currentItemMediaSources = currentItem.MediaSources || [];
+      const currentMediaSource = currentItemMediaSources.length === 1
+        ? currentItemMediaSources[0]
+        : currentItemMediaSources.find((item) => item.Id === mediaSourceId);
+      this.log("debug", "Emby API response received", JSON.stringify(currentMediaSource));
+
       currentItemMediaSources.forEach((item) => {
         this.cache?.set(item.Id, item.Path);
+        this.log("debug", "Cached media source", `${item.Id} -> ${item.Path}`);
       });
+
       // 如果 mediaSources 只有一项，直接用其 ItemId 和 Path 设置缓存，避免后续只存在 ItemId 作为缓存 key 获取不到的问题
       // 且这个 path 不会存在 strm 后缀
       if (currentItemMediaSources.length === 1) {
         this.cache?.set(currentItemMediaSources[0].ItemId, currentItemMediaSources[0].Path);
       }
-      const path = currentItemMediaSources.length === 1
-        ? currentItemMediaSources[0].Path
-        : currentItemMediaSources.find((item) => item.Id === mediaSourceId)?.Path;
-      if (path && !path.includes(".strm")) {
-        return path;
+
+      if (currentMediaSource?.Path && !currentMediaSource.Path.includes(".strm")) {
+        this.log("info", "Media source path fetched", `${currentMediaSource.ItemId} -> ${currentMediaSource.Path}`);
+        return currentMediaSource;
       } else {
         throw new Error("path is not found or invalid");
       }
     } catch (err: any) {
-      console.error("Error fetching media source path:", err);
+      this.log("error", "Error fetching media source path", err.message);
       return null;
     }
   };
@@ -113,41 +184,82 @@ export class EmbyClient implements MediaServer {
     const path = url.pathname;
     const search = url.search;
 
+    let action: ReturnType<identifyProxyActionFn> = "direct";
+
     if (path === "/") {
-      return "redirectIndexHtml";
+      action = "redirectIndexHtml";
     } else if (path === "/web/index.html") {
-      return "rewriteHtml";
+      action = "rewriteHtml";
     } else if (/(emby\/)?Items\/\d+\/PlaybackInfo\/?/.test(path)) {
-      return "rewritePlaybackInfo";
+      action = "rewritePlaybackInfo";
+    } else if (path.includes("/emby/http") && search.includes("FakeDirectStream")) {
+      action = "redirectDirectUrl";
     } else if (/(emby\/)?Videos\/\d+\/stream\/?/.test(path)) {
-      return "rewriteStream";
-    } else if (search.includes("FakeDirectStream")) {
-      return "redirectDirectUrl";
-    } else {
-      return "direct";
+      action = "rewriteStream";
     }
+
+    this.log("trace", "Request identified", `${path} -> ${action}`);
+    return action;
   };
 
   redirectIndexHtml: redirectIndexHtmlFn = () => {
     return "/web/index.html";
   };
 
-  rewriteHtml: rewriteHtmlFn = async (req, originHtml) => {
+  rewriteHtml: rewriteHtmlFn = async (_req, originHtml) => {
     let newHtml = originHtml;
+
+    const finalInjections = [...this.config.injections || []];
+
+    finalInjections.unshift({
+      type: "script",
+      content: `window._mediarelay_type="${this.type}";`,
+    });
+
     if (this.config.webDirect) {
-      const scripts = `<script>${videoCorsScript}</script>`;
-      newHtml = newHtml.replace("<head>", "<head>" + scripts);
+      finalInjections.unshift({ type: "script", src: "/mediarelay/emby/video-cors.js", async: true, defer: true });
     }
+
     if (this.config.externalPlayer?.enabled) {
-      const scripts = `<script>window.EXTERNAL_PLAYER_CONFIG=${
-        JSON.stringify(this.config.externalPlayer)
-      };${externalPlayer}</script>`;
-      newHtml = newHtml.replace("<head>", "<head>" + scripts);
+      finalInjections.unshift({
+        type: "script",
+        content: `window.EXTERNAL_PLAYER_CONFIG=${JSON.stringify(this.config.externalPlayer)};`,
+      }, { type: "script", src: "/mediarelay/emby/external-player.js", async: true, defer: true });
     }
+
+    for (const injection of finalInjections) {
+      if (injection.type === "script") {
+        let tag: string;
+        if (injection.src) {
+          const asyncAttr = injection.async ? " async" : "";
+          const deferAttr = injection.defer ? " defer" : "";
+          tag = `<script src="${injection.src}"${asyncAttr}${deferAttr}></script>`;
+          newHtml = newHtml.replace("<head>", "<head>" + tag);
+        } else if (injection.content) {
+          tag = `<script>${injection.content}</script>`;
+          newHtml = newHtml.replace("<head>", "<head>" + tag);
+        }
+      }
+      if (injection.type === "style") {
+        let tag: string;
+        if (injection.src) {
+          tag = `<link rel="stylesheet" type="text/css" href="${injection.src}"></link>`;
+          newHtml = newHtml.replace("<head>", "<head>" + tag);
+        } else if (injection.content) {
+          tag = `<style>${injection.content}</style>`;
+          newHtml = newHtml.replace("<head>", "<head>" + tag);
+        }
+      }
+    }
+
+    if (finalInjections.length) {
+      this.log("info", "inject success");
+    }
+
     return newHtml;
   };
 
-  rewritePlaybackInfo: rewritePlaybackInfoFn = async (req, res) => {
+  rewritePlaybackInfo: rewritePlaybackInfoFn = async (req, res, extra) => {
     const { ua, origin } = this.getCommonDataFromRequest(req);
     const data: {
       PlaySessionId: string;
@@ -155,6 +267,7 @@ export class EmbyClient implements MediaServer {
     } = await res.json();
 
     if (isWebBrowser(ua) && !this.config.webDirect) {
+      this.log("info", "WebDirect disabled for browser, skipping rewrite");
       return data;
     }
 
@@ -162,15 +275,29 @@ export class EmbyClient implements MediaServer {
 
     for (const item of mediaSources) {
       if (this.isMediaStreamNotSupportByWeb({ ua, mediaStreams: item.MediaStreams })) {
-        console.log("Media stream not supported by web");
         continue;
       }
+
+      if (extra?.shouldRewrite) {
+        const canRewrite = extra.shouldRewrite({
+          path: item.Path,
+          name: item.Name,
+          id: item.Id,
+          container: item.Container,
+        });
+        if (!canRewrite) {
+          this.log("info", "Rewrite skipped: filter rule", JSON.stringify(item));
+          continue;
+        }
+      }
+
       if (item.Path) {
         this.cache?.set(item.Id, item.Path);
+        this.log("debug", "Cached media source path", `${item.Id} -> ${item.Path}`);
       }
       const directUrl =
         `${origin}/Videos/${item.ItemId}/stream?MediaSourceId=${item.Id}&Static=true&FakeDirectStream=true`;
-      console.log(`[Direct Stream URL] ${directUrl}`);
+      this.log("info", "Direct URL generated", `${item.Id}: ${directUrl}`);
       if (directUrl) {
         item.TranscodeReasons = [];
         item.SupportsTranscoding = false;
@@ -185,27 +312,47 @@ export class EmbyClient implements MediaServer {
       this.cache?.set(mediaSources[0].ItemId, mediaSources[0].Path);
     }
 
+    this.log("debug", "PlaybackInfo rewrite completed");
     return data;
   };
 
-  rewriteStream: rewriteStreamFn = async (req) => {
+  rewriteStream: rewriteStreamFn = async (req, extra) => {
     const { ua } = this.getCommonDataFromRequest(req);
 
-    const timeFlag = `rewriteStream-${new Date().getTime()}`;
-    console.time(timeFlag);
-    const path = await this.getMediaSourcePath(req);
-    if (!path) {
+    const res = await this.getMediaSourcePath(req);
+    const { Name, Path, Id, Container } = res || {};
+    if (!Path) {
+      this.log("warn", "Stream rewrite failed: path not found");
       return null;
     }
-    const url = await this.config.getDirectUrl(path, { ua });
-    console.timeEnd(timeFlag);
-    console.log("ua", ua);
-    console.log(`[direct stram]: ${url}`);
+
+    if (extra?.shouldRewrite) {
+      const canRewrite = extra.shouldRewrite({
+        path: Path,
+        name: Name,
+        id: Id,
+        container: Container,
+      });
+      if (!canRewrite) {
+        this.log("info", "Stream rewrite skipped: filter rule", JSON.stringify(res));
+        return null;
+      }
+    }
+
+    this.log("info", "Fetching direct URL", decodeURIComponent(Path));
+    const url = await this.config.getDirectUrl(Path, { ua });
+
+    if (url) {
+      this.log("info", "Stream rewrite succeeded", `${decodeURIComponent(Path)}`);
+    } else {
+      this.log("warn", "Stream rewrite failed: direct URL unavailable", decodeURIComponent(Path));
+    }
+
     return url;
   };
 
   redirectDirectUrl: redirectDirectUrlFn = async (req) => {
-    console.log(`[Fake Direct Stream] Handling fake direct stream URL`);
+    this.log("info", "Handling fake direct stream URL");
     return await this.rewriteStream(req);
   };
 }

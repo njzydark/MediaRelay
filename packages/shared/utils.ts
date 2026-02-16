@@ -59,11 +59,19 @@ export function calculateMaxAgeMs(t: any, n = Date.now()) {
   return Math.max(0, diffSMs);
 }
 
+export function getRequestRealIP(req: Request): string {
+  const headers = req.headers;
+  const ipFromHeaders = headers.get("x-real-ip") ||
+    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "";
+  return ipFromHeaders;
+}
+
 export function getCommonDataFromRequest(req: Request) {
   const url = new URL(req.url);
   const headers = req.headers;
   const ua = headers.get("user-agent") || "";
-  const ip = headers.get("x-real-ip") || headers.get("x-forwarded-for") || "";
+  const ip = getRequestRealIP(req);
 
   const protocol = headers.get("x-forwarded-proto") || url.protocol.replace(":", "");
   const host = headers.get("x-forwarded-host") || headers.get("host") || url.host;
@@ -74,7 +82,7 @@ export function getCommonDataFromRequest(req: Request) {
     ua,
     ip,
     origin,
-    headers,
+    headers: new Headers(req.headers),
   };
 }
 
@@ -98,3 +106,21 @@ export function playbackPositionTicksToSeconds(ticks: number, options?: {
   const formattedSeconds = Number(seconds.toFixed(fractionDigits));
   return Number.isNaN(formattedSeconds) ? "0" : formattedSeconds.toString();
 }
+
+export const parseAuthHeader = (authString: string) => {
+  const result: Record<string, string> = {};
+
+  // 正则解析逻辑：
+  // (\w+): 匹配键名（字母数字下划线）
+  // =: 匹配等号
+  // "([^"]*)": 匹配引号内的内容并捕获
+  const regex = /(\w+)="([^"]*)"/g;
+
+  let match;
+  while ((match = regex.exec(authString)) !== null) {
+    // match[1] 是 Key, match[2] 是 Value
+    result[match[1]] = match[2];
+  }
+
+  return result;
+};

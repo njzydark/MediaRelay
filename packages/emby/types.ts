@@ -18,7 +18,7 @@ export type MediaSources = {
   ItemId: string;
   Path: string;
   Name: string;
-  Container?: "strm";
+  Container?: "strm" | (string & {});
   SupportsTranscoding: boolean;
   SupportsDirectStream: boolean;
   SupportsDirectPlay: boolean;
@@ -38,6 +38,17 @@ export type ItemsApiResponse = {
     Path: string;
     MediaSources?: MediaSources;
   }[];
+};
+
+export type User = {
+  Id: string;
+  Name: string;
+  Type: "User" | (string & {});
+  Policy: {
+    IsAdministrator: boolean;
+    IsDisabled: boolean;
+    IsHidden: boolean;
+  };
 };
 
 export type UserItem = {

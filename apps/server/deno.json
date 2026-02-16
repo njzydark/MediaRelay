@@ -5,8 +5,13 @@
   "tasks": {
     "start": "deno task prepare && deno run -A --env main.ts",
     "dev": "deno task prepare && deno run -A --env --watch main.ts",
-    "compile": "deno task prepare && deno compile -A --output ./mediarelay main.ts",
-    "prepare": "deno task build:emby-scripts",
-    "build:emby-scripts": "deno task --cwd ../../packages/emby build:scripts"
+    "dev:debug": "deno task prepare && deno run -A --inspect-wait --env --watch main.ts",
+    "prepare": "deno task build:emby-scripts && deno task build:jellyfin-scripts && deno task build:webui",
+    "build:jellyfin-scripts": "deno task --cwd ../../packages/jellyfin build:scripts && deno task copy:jellyfin-scripts",
+    "copy:jellyfin-scripts": "rm -rf ./static/jellyfin && mkdir -p ./static/jellyfin && cp -r ../../packages/jellyfin/dist/* ./static/jellyfin",
+    "build:emby-scripts": "deno task --cwd ../../packages/emby build:scripts && deno task copy:emby-scripts",
+    "copy:emby-scripts": "rm -rf ./static/emby && mkdir -p ./static/emby && cp -r ../../packages/emby/dist/* ./static/emby",
+    "build:webui": "deno task --cwd ../web build && deno task copy:webui",
+    "copy:webui": "rm -rf ./static/webui && mkdir -p ./static/webui && cp -r ../web/dist/* ./static/webui"
   }
 }
