@@ -1,0 +1,88 @@
+.Icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.Positioner {
+  z-index: 9999;
+}
+
+.Popup {
+  z-index: 9999;
+  box-sizing: border-box;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  background-color: #fff;
+  transform-origin: var(--transform-origin);
+  transition: transform 150ms, opacity 150ms;
+
+  &[data-starting-style],
+  &[data-ending-style] {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+
+  &[data-instant] {
+    transition: none;
+  }
+
+  .light-mode({
+    outline: 1px solid var(--color-gray-200);
+    box-shadow: 0 10px 15px -3px var(--color-gray-200), 0 4px 6px -4px var(--color-gray-200);
+  },);
+
+  .dark-mode({
+    background-color: #000;
+    color: #fff;
+    outline: 1px solid var(--color-gray-300);
+    outline-offset: -1px;
+  },);
+}
+
+.Arrow {
+  display: flex;
+
+  &[data-side="top"] {
+    bottom: -8px;
+    rotate: 180deg;
+  }
+
+  &[data-side="bottom"] {
+    top: -8px;
+    rotate: 0deg;
+  }
+
+  &[data-side="left"] {
+    right: -13px;
+    rotate: 90deg;
+  }
+
+  &[data-side="right"] {
+    left: -13px;
+    rotate: -90deg;
+  }
+}
+
+.ArrowFill {
+  fill: #fff;
+
+  .dark-mode({
+    fill: #000;
+  },);
+}
+
+.ArrowOuterStroke {
+  .light-mode({
+    fill: var(--color-gray-200);
+  },);
+}
+
+.ArrowInnerStroke {
+  .dark-mode({
+    fill: var(--color-gray-300);
+  },);
+}

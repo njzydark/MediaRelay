@@ -1,0 +1,235 @@
+.Container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Stats Card */
+.StatsCard {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, var(--color-primary) 0%, oklch(55% 0.2 250deg) 100%);
+  border-radius: 0.75rem;
+  color: white;
+}
+
+.Stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.StatValue {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.StatLabel {
+  font-size: 0.6875rem;
+  opacity: 0.9;
+  margin-top: 0.25rem;
+}
+
+.StatDivider {
+  width: 1px;
+  height: 2rem;
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Settings */
+.Settings {
+  background-color: var(--color-gray-50);
+  border-radius: 0.5rem;
+}
+
+.SettingRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+
+  > *:first-child {
+    flex: 1;
+  }
+}
+
+.Unit {
+  font-size: 0.8125rem;
+  color: var(--color-gray-500);
+  margin-bottom: 0.5rem;
+}
+
+.CacheList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ListHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ListTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-gray-800);
+}
+
+.Groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 560px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.Group {
+  background-color: var(--color-gray-100);
+  border: 1px solid var(--color-gray-200);
+  border-radius: 0.5rem;
+  flex-shrink: 0;
+
+  .Content {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+
+    & > * {
+      flex-shrink: 0;
+    }
+
+    .Chevron {
+      cursor: pointer;
+      font-size: 1.25rem;
+      color: var(--color-gray-400);
+      transition: transform 200ms;
+      flex-shrink: 0;
+
+      &.Expanded {
+        transform: rotate(90deg);
+      }
+    }
+
+    .Path {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin: 0 1rem;
+      font-size: 0.85rem;
+    }
+
+    & > button {
+      height: 1.5rem;
+      padding: 0.5rem;
+      font-size: 0.65rem;
+
+      svg {
+        width: 0.8rem;
+        height: 0.8rem;
+      }
+    }
+
+    & > button:last-child {
+      margin-left: 0.5rem;
+    }
+  }
+}
+
+.SubContent {
+  border-bottom-left-radius: 0.5rem;
+  border-bottom-left-radius: 0.5rem;
+  border-top: 1px solid var(--color-gray-100);
+  background-color: var(--color-gray-50);
+
+  .Entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem 0.5rem 2rem;
+    border-bottom: 1px solid var(--color-gray-100);
+
+    .EntryInfo {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+      margin-right: 1rem;
+
+      .EntryUa {
+        font-size: 0.75rem;
+        color: var(--color-gray-600);
+        font-weight: 500;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .EntryUrl {
+        font-size: 0.6875rem;
+        color: var(--color-gray-500);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+
+    .EntryMeta {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-shrink: 0;
+
+      & > button {
+        height: 1.5rem;
+        padding: 0.5rem;
+        font-size: 0.65rem;
+
+        svg {
+          width: 0.8rem;
+          height: 0.8rem;
+        }
+      }
+    }
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}
+
+.Empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  background-color: var(--color-gray-50);
+  border-radius: 0.75rem;
+  border: 1px dashed var(--color-gray-200);
+}
+
+.EmptyIcon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  opacity: 0.6;
+}
+
+.EmptyText {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-gray-600);
+}
+
+.EmptySubtext {
+  font-size: 0.75rem;
+  color: var(--color-gray-400);
+  margin-top: 0.25rem;
+}

@@ -1,0 +1,262 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  width: 50rem;
+  height: 60vh;
+  min-height: 400px;
+  overflow: hidden;
+  max-width: 100%;
+  position: relative;
+}
+
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+
+.toolbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.toolbarRight {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--color-gray-600);
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.statusConnected {
+  background-color: #22c55e;
+}
+
+.statusDisconnected {
+  background-color: #ef4444;
+}
+
+.statusText {
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.logsContainer {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  background-color: var(--color-gray-100);
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+
+  /* 夜间模式适配 */
+  .light-mode({
+    background-color: #1a1a1a;
+  },);
+}
+
+/* 深色模式下的日志容器 */
+@media (prefers-color-scheme: dark) {
+  .logsContainer {
+    background-color: #1a1a1a;
+  }
+}
+
+.empty {
+  color: var(--color-gray-500);
+  text-align: center;
+  padding: 2rem;
+}
+
+.logEntry {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  color: #e5e5e5;
+  white-space: nowrap;
+  min-width: fit-content;
+}
+
+.timestamp {
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.level {
+  font-weight: 600;
+  flex-shrink: 0;
+  min-width: 50px;
+}
+
+.message {
+  flex-shrink: 0;
+}
+
+.details {
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.levelInfo {
+  color: #60a5fa;
+}
+
+.levelWarn {
+  color: #fbbf24;
+}
+
+.levelError {
+  color: #f87171;
+}
+
+.levelDebug {
+  color: #9ca3af;
+}
+
+/* 滚动到底部按钮 */
+.scrollToBottomBtn {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: rgba(59, 130, 246, 0.9);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.scrollToBottomBtn:hover {
+  background-color: rgba(59, 130, 246, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.scrollToBottomBtn:active {
+  transform: translateY(0);
+}
+
+/* 深色模式下的滚动按钮 */
+@media (prefers-color-scheme: dark) {
+  .scrollToBottomBtn {
+    background-color: rgba(96, 165, 250, 0.9);
+  }
+
+  .scrollToBottomBtn:hover {
+    background-color: rgba(96, 165, 250, 1);
+  }
+}
+
+.desktopOnly {
+  display: inline;
+}
+
+.mobileOnly {
+  display: none;
+}
+
+.mobileOnlyIcon {
+  display: none;
+}
+
+/* 移动端适配 */
+@media (max-width: 640px) {
+  .container {
+    height: 70vh;
+    min-height: 300px;
+  }
+
+  .toolbarActions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .toolbarLeft,
+  .toolbarRight {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .toolbarRight {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .desktopOnly {
+    display: none;
+  }
+
+  .mobileOnly {
+    display: inline;
+  }
+
+  .mobileOnlyIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    svg {
+      width: 1rem;
+      height: 1rem;
+    }
+  }
+
+  .iconBtn {
+    padding: 0 0.5rem;
+    min-width: 2rem;
+  }
+
+  .autoScrollBtn {
+    padding: 0 0.5rem;
+  }
+
+  .logsContainer {
+    font-size: 0.75rem;
+  }
+
+  .logEntry {
+    gap: 0.375rem;
+  }
+
+  /* 移动端滚动按钮适配 */
+  .scrollToBottomBtn {
+    width: 36px;
+    height: 36px;
+    bottom: 0.75rem;
+    right: 0.75rem;
+  }
+}

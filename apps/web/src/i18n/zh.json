@@ -1,0 +1,148 @@
+{
+  "app": {
+    "title": "MediaRelay 设置"
+  },
+  "common": {
+    "loading": "加载中...",
+    "save": "保存",
+    "cancel": "取消",
+    "edit": "编辑",
+    "delete": "删除",
+    "add": "添加",
+    "close": "关闭",
+    "refresh": "刷新",
+    "reset": "重置",
+    "confirm": "确定",
+    "success": "保存成功！",
+    "error": "错误",
+    "enabled": "已启用",
+    "disabled": "已禁用"
+  },
+  "tabs": {
+    "general": "常规",
+    "storage": "外部存储",
+    "externalplayer": "外部播放器",
+    "injections": "自定义注入"
+  },
+  "settings": {
+    "title": "常规设置",
+    "webDirect": {
+      "label": "启用网页直链播放",
+      "help": "通过浏览器播放时是否允许走 302 直链播放"
+    },
+    "webDirectLocalFallback": {
+      "label": "启用本地回退",
+      "help": "当存在本地文件且本地文件的音频格式浏览器不支持时是否应该禁用直链播放，回退到本身的转码播放"
+    }
+  },
+  "storage": {
+    "title": "Openlist 配置",
+    "baseUrl": {
+      "label": "基础 URL",
+      "placeholder": "http://openlist:5244"
+    },
+    "token": {
+      "label": "API Token",
+      "placeholder": "您的 API token"
+    },
+    "pathMapping": {
+      "title": "路径映射",
+      "keyPlaceholder": "源路径 (例如: /data/)",
+      "valuePlaceholder": "目标路径 (例如: /115Media/)"
+    }
+  },
+  "cache": {
+    "title": "直链缓存",
+    "stats": {
+      "cachedUrls": "已缓存直链 URL",
+      "ttl": "缓存时间",
+      "paths": "路径数"
+    },
+    "settings": {
+      "ttl": {
+        "label": "缓存有效期",
+        "suffix": "秒"
+      }
+    },
+    "list": {
+      "title": "已缓存路径",
+      "clearAll": "清空全部"
+    },
+    "empty": {
+      "title": "暂无缓存",
+      "description": "访问媒体文件后，URL 将显示在这里"
+    },
+    "actions": {
+      "clearPath": "清除路径",
+      "clearEntry": "清除条目"
+    }
+  },
+  "externalPlayer": {
+    "title": "外部播放器",
+    "enable": "启用外部播放器",
+    "platforms": {
+      "common": "通用",
+      "windows": "Windows",
+      "macos": "macOS",
+      "android": "Android",
+      "ios": "iOS",
+      "linux": "Linux"
+    },
+    "form": {
+      "namePlaceholder": "播放器名称",
+      "schemePlaceholder": "URL Scheme",
+      "iconPlaceholder": "图标 URL (可选)"
+    },
+    "empty": "此平台暂无播放器"
+  },
+  "injections": {
+    "title": "自定义注入",
+    "description": "添加自定义脚本或样式以注入到 Emby 网页界面。这些将在默认的 MediaRelay UI 之外加载。",
+    "type": {
+      "script": "脚本",
+      "style": "样式"
+    },
+    "form": {
+      "urlPlaceholder": "URL (如果使用内容则为可选)",
+      "contentPlaceholder": "内容 (如果使用 URL 则为可选)"
+    },
+    "options": {
+      "async": "异步加载",
+      "defer": "延迟加载"
+    },
+    "empty": "暂无自定义注入"
+  },
+  "logs": {
+    "title": "日志",
+    "status": {
+      "connected": "已连接",
+      "disconnected": "未连接"
+    },
+    "levels": {
+      "all": "全部",
+      "trace": "跟踪",
+      "debug": "调试",
+      "info": "信息",
+      "warn": "警告",
+      "error": "错误"
+    },
+    "actions": {
+      "autoScrollOn": "自动滚动: 开",
+      "autoScrollOff": "自动滚动: 关",
+      "clear": "清空日志",
+      "refresh": "刷新",
+      "scrollToBottom": "滚动到底部"
+    },
+    "empty": "暂无日志"
+  },
+  "keyValue": {
+    "keyPlaceholder": "键",
+    "valuePlaceholder": "值",
+    "empty": "暂无条目"
+  },
+  "errors": {
+    "loadConfig": "加载配置失败",
+    "saveConfig": "保存配置失败",
+    "invalidRequest": "无效的请求"
+  }
+}

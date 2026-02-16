@@ -1,0 +1,29 @@
+{
+  "name": "@mediarelay/web",
+  "version": "1.0.0",
+  "exports": "./src/index.tsx",
+  "imports": {
+    "@base-ui/react": "npm:@base-ui/react@^1.1.0",
+    "@rsbuild/plugin-less": "npm:@rsbuild/plugin-less@^1.6.0",
+    "@rsbuild/plugin-react": "npm:@rsbuild/plugin-react@^1.4.5",
+    "@types/react": "npm:@types/react@^19.2.13",
+    "@types/react-dom": "npm:@types/react-dom@^19.2.3",
+    "classnames": "npm:classnames@^2.5.1",
+    "dayjs": "npm:dayjs@^1.11.19",
+    "react": "npm:react@^19.2.4",
+    "react-dom": "npm:react-dom@^19.2.4",
+    "@rsbuild/core": "npm:@rsbuild/core@^1.1.8"
+  },
+  "tasks": {
+    "dev": "deno run -A npm:@rsbuild/core dev --open",
+    "build": "deno run -A npm:@rsbuild/core build",
+    "preview": "deno run -A npm:@rsbuild/core preview"
+  },
+  "lint": {
+    "rules": {
+      "exclude": [
+        "jsx-button-has-type"
+      ]
+    }
+  }
+}

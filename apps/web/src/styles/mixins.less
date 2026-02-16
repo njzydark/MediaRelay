@@ -1,0 +1,29 @@
+.light-mode(@rules) {
+  @media (prefers-color-scheme: light) {
+    :global(html:not(.theme-dark):not([data-theme="dark"])) & {
+      @rules();
+    }
+  }
+
+  :global(html.theme-light) & {
+    @rules();
+  }
+  :global(html[data-theme="light"]) & {
+    @rules();
+  }
+}
+
+.dark-mode(@rules) {
+  @media (prefers-color-scheme: dark) {
+    :global(html:not(.theme-light):not([data-theme="light"])) & {
+      @rules();
+    }
+  }
+
+  :global(html.theme-dark) & {
+    @rules();
+  }
+  :global(html[data-theme="dark"]) & {
+    @rules();
+  }
+}
