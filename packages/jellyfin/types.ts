@@ -1,0 +1,86 @@
+// deno-lint-ignore-file ban-types
+export type MediaStreams = {
+  Codec: "h264" | "eac3" | "subrip" | "ass" | (string & {});
+  Type: "Video" | "Audio" | "Subtitle" | (string & {});
+  Protocol: "File" | "Http";
+  IsDefault: boolean;
+  IsExternal: boolean;
+  DisplayTitle: string;
+  SupportsExternalStream: boolean;
+  Path: string;
+  Index: number;
+}[];
+
+export type MediaSources = {
+  Id: string;
+  Path: string;
+  Name: string;
+  Container?: "strm" | (string & {});
+  SupportsTranscoding: boolean;
+  SupportsDirectStream: boolean;
+  SupportsDirectPlay: boolean;
+  StreamUrl?: string;
+  TranscodeReasons?: unknown[];
+  Protocol?: "File" | "Http";
+  IsRemote?: boolean;
+  MediaStreams: MediaStreams;
+  DefaultSubtitleStreamIndex?: number;
+  TranscodingUrl?: string;
+  TranscodingContainer?: string;
+  TranscodingSubProtocol?: string;
+}[];
+
+export type ItemsApiResponse = {
+  Items: {
+    Id: string;
+    Path: string;
+    MediaSources?: MediaSources;
+  }[];
+};
+
+export type User = {
+  Id: string;
+  Name: string;
+  Policy: {
+    IsAdministrator: boolean;
+    IsDisabled: boolean;
+    IsHidden: boolean;
+  };
+};
+
+export type UserItem = {
+  Name: string;
+  Id: string;
+  CanDelete: boolean;
+  CanDownload: boolean;
+  SupportsSync: boolean;
+  SortName: string;
+  ForcedSortName: string;
+  ExternalUrls: { Name: string; Url: string }[];
+  Path: string;
+  RunTimeTicks: number;
+  FileName: string;
+  ProviderIds: Record<string, string>;
+  IsFolder: boolean;
+  Type: "Series" | "Season" | "Episode";
+  MediaSources?: MediaSources;
+  MediaStreams?: MediaStreams;
+  UserData?: {
+    PlaybackPositionTicks: number;
+    IsFavorite: boolean;
+    Played: boolean;
+  };
+  ChildCount?: number;
+  IndexNumber?: number;
+  ParentIndexNumber?: number;
+  ParentId?: string;
+  SeriesName?: string;
+  SeriesId?: string;
+  SeasonId?: string;
+  SeasonName?: string;
+};
+
+export type UserItemsApiResponse = {
+  TotalRecordCount: number;
+  Items: UserItem[];
+};
