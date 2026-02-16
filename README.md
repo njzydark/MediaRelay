@@ -29,9 +29,9 @@
 
 ```bash
 # emby
-docker run -d --name mediarelay -e EMBY_URL=http://xxx:8096 -v ./config:/app/config -p 3000:3000 mediarelay
+docker run -d --name mediarelay -e EMBY_URL=http://xxx:8096 -v ./config:/app/config -p 3000:3000 ghcr.io/njzydark/mediarelay:latest
 # jellyfin
-docker run -d --name mediarelay -e JELLYFIN_URL=http://xxx:8096 -v ./config:/app/config -p 3000:3000 mediarelay
+docker run -d --name mediarelay -e JELLYFIN_URL=http://xxx:8096 -v ./config:/app/config -p 3000:3000 ghcr.io/njzydark/mediarelay:latest
 ```
 
 访问 3000 端口，点击顶部头像即可看到 mediarelay 功能设置入口
