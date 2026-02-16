@@ -6,11 +6,12 @@
   "unstable": ["raw-imports"],
   "tasks": {
     "dev": "deno task --cwd apps/server dev",
-    "compile": "deno task --cwd apps/server compile",
+    "compile": "deno task --cwd apps/server prepare && deno compile -A --exclude node_modules --include node_modules/.deno/quick-lru@7.3.0 --output ./apps/server/mediarelay ./apps/server/main.ts",
     "test": "deno test -A --parallel --quiet",
     "lint": "deno lint",
     "fmt": "deno fmt"
   },
+  "nodeModulesDir": "auto",
   "imports": {
     "@lib/shared": "./packages/shared/mod.ts",
     "@lib/openlist": "./packages/openlist/mod.ts",
@@ -20,7 +21,7 @@
     "@std/expect": "jsr:@std/expect@^1.0.13",
     "@std/testing": "jsr:@std/testing@^1.0.9",
     "@std/dotenv": "jsr:@std/dotenv@^0.225.3",
-    "quick-lru": "npm:quick-lru@^7.3.0"
+    "quick-lru": "npm:quick-lru@7.3.0"
   },
   "fmt": {
     "useTabs": false,

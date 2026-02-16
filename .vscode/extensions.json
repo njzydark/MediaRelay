@@ -1,5 +1,6 @@
 {
   "recommendations": [
-    "denoland.vscode-deno"
+    "denoland.vscode-deno",
+    "clinyong.vscode-css-modules"
   ]
 }

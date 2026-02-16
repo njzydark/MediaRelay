@@ -2,5 +2,7 @@
 node_modules
 dist
 .DS_Store
+mediarelay
 coverage
-apps/server/config.json
+apps/server/config
+apps/server/static

@@ -8,5 +8,8 @@
   },
   "[json]": {
     "editor.defaultFormatter": "denoland.vscode-deno"
-  }
+  },
+  "[less]": {
+    "editor.defaultFormatter": "denoland.vscode-deno"
+  },
 }

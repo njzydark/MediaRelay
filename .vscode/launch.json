@@ -5,18 +5,13 @@
       "request": "launch",
       "name": "app-server",
       "type": "node",
-      "program": "${workspaceFolder}/apps/server/main.ts",
       "cwd": "${workspaceFolder}/apps/server",
       "env": {},
       "runtimeExecutable": "${userHome}/.deno/bin/deno",
       "runtimeArgs": [
-        "run",
-        "--env-file",
-        "--inspect-wait",
-        "--allow-all",
-        "--unstable-raw-imports"
+        "task",
+        "dev:debug",
       ],
-      "preLaunchTask": "emby-scripts",
       "attachSimplePort": 9229
     }
   ]

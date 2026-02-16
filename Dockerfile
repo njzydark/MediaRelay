@@ -1,12 +1,13 @@
 # Build stage
-FROM denoland/deno:alpine-2.6.4 AS builder
+FROM denoland/deno:2.6.4 AS builder
 WORKDIR /app
 COPY . .
-# Install dependencies (use just `deno install` if deno.json has imports)
 RUN deno task compile
 
 # Production stage
-FROM alpine:latest
+FROM gcr.io/distroless/cc-debian12
 WORKDIR /app
-COPY --from=builder /app/apps/server/emby2openlist .
-CMD ["./emby2openlist"]
+ENV CONFIG_DIR=/app/config
+COPY --from=builder /app/apps/server/mediarelay .
+COPY --from=builder /app/apps/server/static ./static
+CMD ["./mediarelay"]

@@ -1,0 +1,8 @@
+**/.env
+**/node_modules
+**/dist
+**/.DS_Store
+**/mediarelay
+**/coverage
+apps/server/config
+.vscode

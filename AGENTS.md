@@ -1,71 +1,117 @@
-# Developer Guidelines for Emby2Openlist
+# AGENTS.md
 
-This document outlines the development standards, commands, and conventions for the Emby2Openlist codebase. This project is a Deno-based monorepo.
+## Project Context & Principles
 
-## 1. Toolchain & Commands
+**Goal**:
 
-This project uses **Deno** for runtime, testing, linting, and formatting.
+To improve Emby/Jellyfin playback performance by redirecting media requests to high-speed direct links (via Openlist/115 Drive), bypassing the low-bandwidth Emby server
 
-### Core Commands
-- **Dev Server**: `deno task dev` (Starts the server in `apps/server`)
-- **Compile**: `deno task compile` (Compiles the server to a binary)
-- **Format Code**: `deno task fmt` (Runs `deno fmt`)
-- **Lint Code**: `deno task lint` (Runs `deno lint`)
-- **Run Tests**: `deno task test` (Runs all tests in parallel)
+**Core Workflow (The "Why"):**
 
-### Running Specific Tests
-To run a specific test file or test case, use the standard Deno test flags:
-```bash
-# Run a specific test file
-deno test -A packages/shared/utils.test.ts
+1.  **Intercept**: The HonoJS server acts as a middleware/proxy for the Emby Client/Emby Web
+2.  **Rewrite**: When a specific API request (e.g., `/Items/{Id}/PlaybackInfo`) is detected:
+    - Extract the media hash/id
+    - Resolve the direct download link using `/packages/openlist`
+    - Replace the original media source URL in the JSON response
+3.  **Proxy**: All other non-media requests (images, metadata) are transparently proxied to the upstream Emby server
 
-# Run a specific test case by name (regex)
-deno test -A --filter "my test case" packages/shared/utils.test.ts
+**Key Concepts**:
+
+- **Upstream**: The original Emby Server
+- **Direct Link**: The short-lived, high-speed URL from the cloud storage
+- **Rewriter**: The logic that patches the JSON response body
+
+## Tech Stack & Frameworks
+
+### Core
+- **Runtime**: Deno 2.x (Use `deno` for all commands)
+- **Package Management**: Deno Workspaces (No `package.json`, use `deno.json` imports)
+- **Build Tool (App)**: Rsbuild (Rspack based)
+- **Build Tool (Lib)**: Rslib (Rspack based)
+
+### Backend (API)
+- **Framework**: HonoJS (Deno adapter)
+- **Logic**: Pure TypeScript
+
+### Frontend (Web UI)
+- **Framework**: react 19
+- **UI**: [BaseUI](https://base-ui.com/llms.txt)
+
+## Project Structure
+
+- `/apps/web`: react 19 Frontend application (built with Rsbuild)
+- `/apps/server`: HonoJS Backend server
+- `/packages/shared`: shared types/logic
+- `/packages/openlist`: openlist logic for get direct url
+- `/packages/emby`: emby login for rewrite emby response (built with Rslib)
+- `/deno.json`: Root configuration
+
+## Critical Development Rules (MUST FOLLOW)
+
+### Deno & TypeScript
+
+- Use Web Standard APIs (Request, Response, fetch)
+
+### Verification Standards (The "Definition of Done")
+
+Before finalizing any code change, ensure it passes strict Deno standards:
+
+- **Format**: Code must match `deno fmt` rules
+- **Lint**: No `deno lint` errors
+- **Types**: Must pass `deno check`. **DO NOT** use `@ts-ignore` unless absolutely necessary and documented
+
+## Code style
+
+```json
+"useTabs": false,
+"lineWidth": 120,
+"indentWidth": 2,
+"semiColons": true,
+"singleQuote": false,
+"proseWrap": "preserve",
 ```
 
-## 2. Project Structure
+## Common commands
 
-The project follows a monorepo structure:
-- **`apps/server`**: The main application entry point (Hono server).
-- **`packages/`**: Shared libraries and specific integrations.
-  - **`shared`**: Common utilities, types, and interfaces (`@lib/shared`).
-  - **`emby`**: Emby integration logic and client (`@lib/emby`).
-  - **`openlist`**: Openlist/Alist integration (`@lib/openlist`).
+```bash
+# test
+deno test
+# lint
+deno lint
+# types check
+deno check
+# format code
+deno fmt
+# server dev watch mode
+deno task dev
+# compile server
+deno task compile
+```
 
-## 3. Code Style & Conventions
+## Unit Test Guidelines
 
-### Formatting
-- **Indentation**: 2 spaces.
-- **Line Width**: 120 characters.
-- **Quotes**: Double quotes (`"`).
-- **Semicolons**: Always use semicolons (`true`).
-- **Enforcement**: Run `deno task fmt` to automatically fix formatting.
+Follow BDD (Behavior Driven Development) style using Deno Standard Library. Do not use Jest or Vitest syntax
 
-### Naming Conventions
-- **Files**: Kebab-case (e.g., `external-player.ts`, `video-cors.ts`).
-- **Classes**: PascalCase (e.g., `EmbyClient`, `MediaServer`).
-- **Functions/Variables**: camelCase (e.g., `bootstrap`, `calculateMaxAgeMs`).
-- **Interfaces/Types**: PascalCase (e.g., `EmbyConfig`, `ItemsApiResponse`).
+```ts
+import { describe, it } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { FakeTime } from "@std/testing/time";
+import { calculateMaxAgeMs, getCommonDataFromRequest, isWebBrowser, playbackPositionTicksToSeconds } from "./utils.ts";
 
-### TypeScript
-- **Strictness**: Types should be explicit. Avoid `any` unless absolutely necessary (though `no-explicit-any` is currently excluded in lint rules, prefer strict types).
-- **Interfaces**: Define interfaces for API responses and configuration objects.
-- **Imports**:
-  - Use mapped imports defined in `deno.json` for internal packages (e.g., `import { ... } from "@lib/shared";`).
-  - Use `jsr:` or `npm:` prefixes for external dependencies as defined in `deno.json` imports.
+describe("playbackPositionTicksToSeconds", () => {
+  it("basic", () => {
+    expect(playbackPositionTicksToSeconds(10_000_000)).toBe("1");
+    expect(playbackPositionTicksToSeconds(0)).toBe("0");
+    expect(playbackPositionTicksToSeconds(1_359_000)).toBe("0.135");
+    expect(playbackPositionTicksToSeconds(1_354_000)).toBe("0.135");
+  });
 
-### Error Handling
-- Use `try...catch` blocks for external API calls and async operations.
-- Log errors using `console.error` with descriptive messages.
-- Fail gracefully or return `null`/default values where appropriate to prevent server crashes.
-
-### Logging
-- Use `console.log` for general info and `console.error` for errors.
-- The Hono logger middleware is also enabled in the main server application.
-
-## 4. Architecture & Patterns
-
-- **Dependency Injection**: Configuration is typically passed into class constructors (e.g., `new EmbyClient(config)`).
-- **Interfaces**: The `MediaServer` interface in `@lib/shared` defines the contract for media server integrations.
-- **Hono**: The server uses Hono for routing and middleware.
-- **Environment**: Configuration is loaded from environment variables/config files via `loadConfig()` in `apps/server/config.ts`.
+  it("custom fraction digits", () => {
+    // 0.0019 seconds = 19,000 ticks
+    const ticks = 19000;
+    expect(playbackPositionTicksToSeconds(ticks)).toBe("0.001");
+    expect(playbackPositionTicksToSeconds(ticks, { fractionDigits: 2 })).toBe("0");
+    expect(playbackPositionTicksToSeconds(ticks, { fractionDigits: 4 })).toBe("0.0019");
+  });
+});
+```
