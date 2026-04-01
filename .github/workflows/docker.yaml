@@ -1,4 +1,4 @@
-name: Docker Build
+name: Docker Build (Native Multi-arch)
 
 on:
   workflow_dispatch:
@@ -13,12 +13,23 @@ permissions:
   packages: write
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      image_name: ${{ steps.lower.outputs.image_name }}
+    steps:
+      - id: lower
+        run: |
+          IMAGE_NAME=$(echo "ghcr.io/${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
+
   build:
+    needs: prepare
     strategy:
       matrix:
         include:
           - platform: linux/amd64
-            runner: ubuntu-24.04
+            runner: ubuntu-latest
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
@@ -41,7 +52,7 @@ jobs:
         with:
           context: .
           platforms: ${{ matrix.platform }}
-          outputs: type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ needs.prepare.outputs.image_name }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
 
@@ -60,7 +71,7 @@ jobs:
 
   merge:
     runs-on: ubuntu-latest
-    needs: build
+    needs: [prepare, build]
     steps:
       - name: Download digests
         uses: actions/download-artifact@v4
@@ -81,7 +92,6 @@ jobs:
 
       - name: Create manifest list and push
         run: |
-          REPO_LOWER=$(echo "ghcr.io/${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           cd /tmp/digests
-          docker buildx imagetools create --tag ${REPO_LOWER}:${{ github.event.inputs.tag }} \
-            $(printf "${REPO_LOWER}@sha256:%s " *)
+          docker buildx imagetools create --tag ${{ needs.prepare.outputs.image_name }}:${{ github.event.inputs.tag }} \
+            $(printf "${{ needs.prepare.outputs.image_name }}@sha256:%s " *)
