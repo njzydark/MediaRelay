@@ -61,6 +61,7 @@ export type identifyProxyActionFn = (
   | "rewriteHtml"
   | "rewritePlaybackInfo"
   | "rewriteStream"
+  | "rewriteDownload"
   | "redirectDirectUrl"
   | "generateM3U";
 export type getUserInfoFn = (

@@ -196,6 +196,8 @@ export class EmbyClient implements MediaServer {
       action = "redirectDirectUrl";
     } else if (/(emby\/)?Videos\/\d+\/stream\/?/.test(path)) {
       action = "rewriteStream";
+    } else if (/(emby\/)?Items\/\d+\/Download\/?/.test(path)) {
+      action = "rewriteDownload";
     }
 
     this.log("trace", "Request identified", `${path} -> ${action}`);

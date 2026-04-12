@@ -218,8 +218,9 @@ async function main() {
           headers: responseHeaders,
         });
       }
-      case "rewriteStream": {
-        log.info("Proxy: Rewriting stream URL", `URL: ${url.pathname}`);
+      case "rewriteStream":
+      case "rewriteDownload": {
+        log.info(`Proxy: [${proxyAction}] Rewriting stream URL`, `URL: ${url.pathname}`);
         const streamUrl = await mediaServer.rewriteStream(request, {
           shouldRewrite: (mediaSourceInfo) => {
             return configService.isAllowDirectStreamByFilterRules({
@@ -230,8 +231,8 @@ async function main() {
             });
           },
         });
-        if (streamUrl) {
-          log.info(`Proxy: Stream redirected to direct URL`, streamUrl);
+        if (streamUrl && typeof streamUrl === "string") {
+          log.info(`Proxy: [${proxyAction}] Stream redirected to direct URL`, streamUrl);
           return new Response(null, {
             status: 302,
             headers: {

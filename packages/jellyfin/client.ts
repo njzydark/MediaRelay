@@ -197,6 +197,8 @@ export class JellyfinClient implements MediaServer {
       action = "redirectDirectUrl";
     } else if (/Videos\/(\d|\w)+\/stream\/?/.test(path)) {
       action = "rewriteStream";
+    } else if (/Items\/(\d|\w)+\/Download\/?/.test(path)) {
+      action = "rewriteDownload";
     }
 
     this.log("trace", "Request identified", `${path} -> ${action}`);
