@@ -191,6 +191,8 @@ export class JellyfinClient implements MediaServer {
       action = "redirectIndexHtml";
     } else if (path === "/web/index.html") {
       action = "rewriteHtml";
+    } else if (path.includes(".js") || path.includes("woff2") || path.includes("/Images")) {
+      action = "direct";
     } else if (/Items\/(\d|\w)+\/PlaybackInfo\/?/.test(path)) {
       action = "rewritePlaybackInfo";
     } else if (path.includes("/http") && search.includes("FakeDirectStream")) {
