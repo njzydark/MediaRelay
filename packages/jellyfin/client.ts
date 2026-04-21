@@ -18,6 +18,10 @@ import QuickLRU from "quick-lru";
 import { getCommonDataFromRequest, isWebBrowser, parseAuthHeader } from "@lib/shared";
 import type { ItemsApiResponse, MediaSources, MediaStreams, User } from "./types.ts";
 
+const PLAYBACK_INFO_RE = /(?:^|\/)Items\/[^/]+\/PlaybackInfo\/?$/;
+const STREAM_RE = /(?:^|\/)Videos\/[^/]+\/stream\/?$/;
+const DOWNLOAD_RE = /(?:^|\/)Items\/[^/]+\/Download\/?$/;
+
 export interface JellyfinConfig {
   baseUrl: string;
   webDirect?: boolean;
@@ -191,13 +195,13 @@ export class JellyfinClient implements MediaServer {
       action = "redirectIndexHtml";
     } else if (path === "/web/index.html") {
       action = "rewriteHtml";
-    } else if (/Items\/(\d|\w)+\/PlaybackInfo\/?/.test(path)) {
+    } else if (PLAYBACK_INFO_RE.test(path)) {
       action = "rewritePlaybackInfo";
     } else if (path.includes("/http") && search.includes("FakeDirectStream")) {
       action = "redirectDirectUrl";
-    } else if (/Videos\/(\d|\w)+\/stream\/?/.test(path)) {
+    } else if (STREAM_RE.test(path)) {
       action = "rewriteStream";
-    } else if (/Items\/(\d|\w)+\/Download\/?/.test(path)) {
+    } else if (DOWNLOAD_RE.test(path)) {
       action = "rewriteDownload";
     }
 

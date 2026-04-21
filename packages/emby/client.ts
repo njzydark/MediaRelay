@@ -18,6 +18,10 @@ import QuickLRU from "quick-lru";
 import { getCommonDataFromRequest, isWebBrowser } from "@lib/shared";
 import type { ItemsApiResponse, MediaSources, MediaStreams, User } from "./types.ts";
 
+const PLAYBACK_INFO_RE = /(?:^|\/)(?:emby\/)?Items\/[^/]+\/PlaybackInfo\/?$/;
+const STREAM_RE = /(?:^|\/)(?:emby\/)?Videos\/[^/]+\/stream\/?$/;
+const DOWNLOAD_RE = /(?:^|\/)(?:emby\/)?Items\/[^/]+\/Download\/?$/;
+
 export interface EmbyConfig {
   baseUrl: string;
   webDirect?: boolean;
@@ -190,13 +194,13 @@ export class EmbyClient implements MediaServer {
       action = "redirectIndexHtml";
     } else if (path === "/web/index.html") {
       action = "rewriteHtml";
-    } else if (/(emby\/)?Items\/\d+\/PlaybackInfo\/?/.test(path)) {
+    } else if (PLAYBACK_INFO_RE.test(path)) {
       action = "rewritePlaybackInfo";
     } else if (path.includes("/emby/http") && search.includes("FakeDirectStream")) {
       action = "redirectDirectUrl";
-    } else if (/(emby\/)?Videos\/\d+\/stream\/?/.test(path)) {
+    } else if (STREAM_RE.test(path)) {
       action = "rewriteStream";
-    } else if (/(emby\/)?Items\/\d+\/Download\/?/.test(path)) {
+    } else if (DOWNLOAD_RE.test(path)) {
       action = "rewriteDownload";
     }
 
