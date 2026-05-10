@@ -11,7 +11,7 @@ export const defaultCommonPlayers: ExternalPlayerConfig["common"] = [
 
 export const defaultPlatformPlayers: Omit<ExternalPlayerConfig, "enabled"> = {
   windows: [
-    { name: "PotPlayer", scheme: "potplayer://$url" },
+    { name: "PotPlayer", scheme: 'potplayer://$url /sub=$sub /seek=$start /title="$title"' },
   ],
   macos: [
     {
@@ -47,7 +47,15 @@ export function transformExternalPlayerScheme(scheme: string, options: {
 }) {
   const { videoUrl, title, startSeconds: _startSeconds, allSubtitles = [] } = options;
 
-  let subUrl = encodeURIComponent(allSubtitles?.[0]?.url) || "";
+  const isPotPlayerScheme = scheme.startsWith("potplayer:");
+  const encodedUrl = createEncodedValue(videoUrl);
+  const encodedTitle = createEncodedValue(title || "");
+  const firstSubtitleUrl = allSubtitles?.[0]?.url || "";
+  const encodedSubtitle = createEncodedValue(firstSubtitleUrl);
+  const defaultUrlEncoding: keyof EncodedValue = isPotPlayerScheme ? "encodeURL" : "encodeURIComponent";
+  const defaultTitleEncoding: keyof EncodedValue = isPotPlayerScheme ? "raw" : "encodeURIComponent";
+  let subUrl = encodedSubtitle[defaultUrlEncoding];
+  const titleValue = encodedTitle[defaultTitleEncoding];
   let startSeconds = _startSeconds || 0;
 
   if (scheme.startsWith("iina://")) {
@@ -61,19 +69,29 @@ export function transformExternalPlayerScheme(scheme: string, options: {
   }
 
   const vars: Record<string, string | number | undefined | null> = {
-    "$url": encodeURIComponent(videoUrl),
-    "$title": encodeURIComponent(title || ""),
+    "$urlRaw": encodedUrl.raw,
+    "$urlEncodeURL": encodedUrl.encodeURL,
+    "$urlEncodeURIComponent": encodedUrl.encodeURIComponent,
+    "$url": encodedUrl[defaultUrlEncoding],
+    "$titleRaw": encodedTitle.raw,
+    "$titleEncodeURL": encodedTitle.encodeURL,
+    "$titleEncodeURIComponent": encodedTitle.encodeURIComponent,
+    "$title": titleValue,
+    "$subRaw": encodedSubtitle.raw,
+    "$subEncodeURL": encodedSubtitle.encodeURL,
+    "$subEncodeURIComponent": encodedSubtitle.encodeURIComponent,
     "$sub": subUrl,
     "$start": startSeconds,
   };
 
   let result = scheme;
 
-  for (const [key, value] of Object.entries(vars)) {
+  for (const [key, value] of Object.entries(vars).sort(([a], [b]) => b.length - a.length)) {
     const isMissing = value === undefined || value === null || value === "";
 
     if (isMissing) {
       result = result
+        .replace(new RegExp(`\\s+\\/[^\\s]*\\${key}[^\\s]*(?=\\s|$)`, "g"), "")
         .replace(new RegExp(`&[^&?]*\\${key}`, "g"), "")
         .replace(new RegExp(`\\?[^&?]*\\${key}&`, "g"), "?")
         .replace(new RegExp(`\\?[^&?]*\\${key}`, "g"), "")
@@ -83,5 +101,21 @@ export function transformExternalPlayerScheme(scheme: string, options: {
     }
   }
 
-  return result.replace(/\?$/, "").replace(/\?&/, "?");
+  const final = result.replace(/\?$/, "").replace(/\?&/, "?");
+  console.log({ final });
+  return final;
+}
+
+type EncodedValue = {
+  raw: string;
+  encodeURL: string;
+  encodeURIComponent: string;
+};
+
+function createEncodedValue(value: string): EncodedValue {
+  return {
+    raw: value,
+    encodeURL: value ? encodeURI(value) : "",
+    encodeURIComponent: value ? encodeURIComponent(value) : "",
+  };
 }
