@@ -120,6 +120,11 @@ export class JellyfinClient implements MediaServer {
           headers,
         },
       );
+      this.log(
+        "trace",
+        "User info response",
+        `status: ${response.status}, contentType: ${response.headers.get("content-type")}`,
+      );
       const data: User = await response.json();
       this.log("trace", "User info fetched", `name: ${data.Name}, isAdmin: ${data.Policy.IsAdministrator}`);
       return {
