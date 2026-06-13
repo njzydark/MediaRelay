@@ -1,5 +1,5 @@
 # Build stage
-FROM denoland/deno:2.6.4 AS builder
+FROM denoland/deno:2.8.3 AS builder
 WORKDIR /app
 COPY . .
 RUN deno task compile
