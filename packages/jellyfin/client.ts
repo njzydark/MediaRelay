@@ -15,7 +15,13 @@ import type {
   ServerConfigChangeCallback,
 } from "@lib/shared";
 import QuickLRU from "quick-lru";
-import { getCommonDataFromRequest, isWebBrowser, parseAuthHeader } from "@lib/shared";
+import {
+  getCommonDataFromRequest,
+  getUpstreamJsonHeaders,
+  isWebBrowser,
+  parseAuthHeader,
+  readJsonResponse,
+} from "@lib/shared";
 import type { ItemsApiResponse, MediaSources, MediaStreams, User } from "./types.ts";
 
 const PLAYBACK_INFO_RE = /(?:^|\/)Items\/[^/]+\/PlaybackInfo\/?$/;
@@ -110,10 +116,9 @@ export class JellyfinClient implements MediaServer {
       return null;
     }
     this.log("trace", "Fetching user info", `userId: ${userId}`);
-    const { headers } = this.getCommonDataFromRequest(req);
+    const headers = getUpstreamJsonHeaders(req);
     try {
       headers.set("authorization", `MediaBrowser Client="Jellyfin%20Web", Token="${token}"`);
-      headers.set("accept", "application/json");
       const response = await fetch(
         `${this.config.baseUrl}/Users/${userId}`,
         {
@@ -125,7 +130,7 @@ export class JellyfinClient implements MediaServer {
         "User info response",
         `status: ${response.status}, contentType: ${response.headers.get("content-type")}`,
       );
-      const data: User = await response.json();
+      const data = await readJsonResponse<User>(response, "Jellyfin user info");
       this.log("trace", "User info fetched", `name: ${data.Name}, isAdmin: ${data.Policy.IsAdministrator}`);
       return {
         isAdmin: data.Policy.IsAdministrator,
@@ -139,7 +144,8 @@ export class JellyfinClient implements MediaServer {
   };
 
   getMediaSourcePath: getMediaSourcePathFn = async (req) => {
-    const { itemId, headers, mediaSourceId, token, userId } = this.getCommonDataFromRequest(req);
+    const { itemId, mediaSourceId, token, userId } = this.getCommonDataFromRequest(req);
+    const headers = getUpstreamJsonHeaders(req);
 
     this.log("debug", "Getting media source path", `itemId: ${itemId}, mediaSourceId: ${mediaSourceId}`);
 
@@ -151,7 +157,6 @@ export class JellyfinClient implements MediaServer {
 
     try {
       headers.set("authorization", `MediaBrowser Client="Jellyfin%20Web", Token="${token}"`);
-      headers.set("accept", "application/json");
       const response = await fetch(
         `${this.config.baseUrl}/Items?fields=Path,MediaSources&ids=${itemId}&userId=${userId}`,
         {
@@ -163,7 +168,7 @@ export class JellyfinClient implements MediaServer {
         this.log("error", "Fetch media path failed", `Status: ${response.status}, Body: ${errorText}`);
         throw new Error(`HTTP Error ${response.status}: ${errorText}`);
       }
-      const data: ItemsApiResponse = await response.json();
+      const data = await readJsonResponse<ItemsApiResponse>(response, "Jellyfin media source path");
 
       const currentItem = data?.Items?.[0];
       const currentItemMediaSources = currentItem.MediaSources || [];
@@ -276,7 +281,7 @@ export class JellyfinClient implements MediaServer {
     const data: {
       PlaySessionId: string;
       MediaSources: MediaSources;
-    } = await res.json();
+    } = await readJsonResponse(res, "Jellyfin PlaybackInfo");
 
     if (isWebBrowser(ua) && !this.config.webDirect) {
       this.log("info", "WebDirect disabled for browser, skipping rewrite");

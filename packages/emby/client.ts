@@ -15,7 +15,7 @@ import type {
   ServerConfigChangeCallback,
 } from "@lib/shared";
 import QuickLRU from "quick-lru";
-import { getCommonDataFromRequest, isWebBrowser } from "@lib/shared";
+import { getCommonDataFromRequest, getUpstreamJsonHeaders, isWebBrowser, readJsonResponse } from "@lib/shared";
 import type { ItemsApiResponse, MediaSources, MediaStreams, User } from "./types.ts";
 
 const PLAYBACK_INFO_RE = /(?:^|\/)(?:emby\/)?Items\/[^/]+\/PlaybackInfo\/?$/;
@@ -108,7 +108,7 @@ export class EmbyClient implements MediaServer {
       return null;
     }
     this.log("trace", "Fetching user info", `userId: ${userId}`);
-    const { headers } = this.getCommonDataFromRequest(req);
+    const headers = getUpstreamJsonHeaders(req);
     try {
       const response = await fetch(
         `${this.config.baseUrl}/emby/Users/${userId}?${
@@ -123,7 +123,7 @@ export class EmbyClient implements MediaServer {
         "User info response",
         `status: ${response.status}, contentType: ${response.headers.get("content-type")}`,
       );
-      const data: User = await response.json();
+      const data = await readJsonResponse<User>(response, "Emby user info");
       this.log("trace", "User info fetched", `name: ${data.Name}, isAdmin: ${data.Policy.IsAdministrator}`);
       return {
         isAdmin: data.Policy.IsAdministrator,
@@ -137,7 +137,8 @@ export class EmbyClient implements MediaServer {
   };
 
   getMediaSourcePath: getMediaSourcePathFn = async (req) => {
-    const { itemId, headers, mediaSourceId, token, apiKey } = this.getCommonDataFromRequest(req);
+    const { itemId, mediaSourceId, token, apiKey } = this.getCommonDataFromRequest(req);
+    const headers = getUpstreamJsonHeaders(req);
 
     this.log("debug", "Getting media source path", `itemId: ${itemId}, mediaSourceId: ${mediaSourceId}`);
 
@@ -156,7 +157,7 @@ export class EmbyClient implements MediaServer {
           headers,
         },
       );
-      const data: ItemsApiResponse = await response.json();
+      const data = await readJsonResponse<ItemsApiResponse>(response, "Emby media source path");
 
       const currentItem = data?.Items?.[0];
       const currentItemMediaSources = currentItem.MediaSources || [];
@@ -275,7 +276,7 @@ export class EmbyClient implements MediaServer {
     const data: {
       PlaySessionId: string;
       MediaSources: MediaSources;
-    } = await res.json();
+    } = await readJsonResponse(res, "Emby PlaybackInfo");
 
     if (isWebBrowser(ua) && !this.config.webDirect) {
       this.log("info", "WebDirect disabled for browser, skipping rewrite");

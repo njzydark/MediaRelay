@@ -86,6 +86,36 @@ export function getCommonDataFromRequest(req: Request) {
   };
 }
 
+export function getUpstreamJsonHeaders(req: Request): Headers {
+  const headers = new Headers(req.headers);
+
+  headers.set("accept", "application/json");
+  headers.set("accept-encoding", "identity");
+
+  headers.delete("host");
+  headers.delete("content-length");
+
+  return headers;
+}
+
+export async function readJsonResponse<T>(response: Response, context = "JSON response"): Promise<T> {
+  const text = await response.text();
+
+  try {
+    return JSON.parse(text) as T;
+  } catch (err: any) {
+    const preview = text.slice(0, 200).replace(/\s+/g, " ");
+    const details = [
+      `status: ${response.status}`,
+      `contentType: ${response.headers.get("content-type") || "unknown"}`,
+      `contentEncoding: ${response.headers.get("content-encoding") || "none"}`,
+      `bodyPreview: ${preview}`,
+    ].join(", ");
+
+    throw new Error(`${context} parse failed: ${err.message}; ${details}`);
+  }
+}
+
 export function playbackPositionTicksToSeconds(ticks: number, options?: {
   /**
    * @default 3

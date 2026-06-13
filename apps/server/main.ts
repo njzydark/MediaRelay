@@ -8,7 +8,7 @@ import { EmbyClient } from "@lib/emby";
 import { JellyfinClient } from "@lib/jellyfin";
 import { OpenlistClient } from "@lib/openlist";
 import type { MediaServer } from "@lib/shared";
-import { getRequestRealIP } from "@lib/shared";
+import { getRequestRealIP, getUpstreamJsonHeaders } from "@lib/shared";
 import { generateProxyRequest } from "./proxy.ts";
 import { createConfigAdminAuth, createRequestLogger } from "./middleware.ts";
 import { log } from "./logs.ts";
@@ -192,9 +192,12 @@ async function main() {
       }
       case "rewritePlaybackInfo": {
         log.info("Proxy: Rewriting PlaybackInfo", `URL: ${url.pathname}`);
-        const response = await generateProxyRequest(c, mediaServer.baseUrl);
+        const response = await generateProxyRequest(c, mediaServer.baseUrl, {
+          headers: getUpstreamJsonHeaders(request),
+        });
         const responseHeaders = new Headers(response.headers);
         responseHeaders.delete("content-length");
+        responseHeaders.delete("content-encoding");
 
         if (!response.ok) {
           log.warn("Proxy: PlaybackInfo request failed", `Status: ${response.status}`);

@@ -1,7 +1,14 @@
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { FakeTime } from "@std/testing/time";
-import { calculateMaxAgeMs, getCommonDataFromRequest, isWebBrowser, playbackPositionTicksToSeconds } from "./utils.ts";
+import {
+  calculateMaxAgeMs,
+  getCommonDataFromRequest,
+  getUpstreamJsonHeaders,
+  isWebBrowser,
+  playbackPositionTicksToSeconds,
+  readJsonResponse,
+} from "./utils.ts";
 
 describe("isWebBrowser", () => {
   it("common web browsers", () => {
@@ -96,6 +103,64 @@ describe("getCommonDataFromRequest", () => {
     expect(commonData.ua).toBe("");
     expect(commonData.ip).toBe("");
     expect(commonData.origin).toBe("http://example.com:4433");
+  });
+});
+
+describe("getUpstreamJsonHeaders", () => {
+  it("normalizes headers for upstream JSON requests", () => {
+    const req = new Request("http://example.com/path", {
+      method: "POST",
+      headers: {
+        "Accept-Encoding": "br, gzip",
+        "Authorization": 'MediaBrowser Token="abc"',
+        "Content-Length": "1",
+        "Host": "client.example.com",
+        "User-Agent": "TestAgent",
+      },
+      body: "x",
+    });
+
+    const headers = getUpstreamJsonHeaders(req);
+
+    expect(headers.get("accept")).toBe("application/json");
+    expect(headers.get("accept-encoding")).toBe("identity");
+    expect(headers.get("authorization")).toBe('MediaBrowser Token="abc"');
+    expect(headers.get("user-agent")).toBe("TestAgent");
+    expect(headers.has("content-length")).toBe(false);
+    expect(headers.has("host")).toBe(false);
+  });
+});
+
+describe("readJsonResponse", () => {
+  it("parses valid JSON", async () => {
+    const data = await readJsonResponse<{ ok: boolean }>(
+      new Response(JSON.stringify({ ok: true }), {
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    expect(data.ok).toBe(true);
+  });
+
+  it("includes response metadata when parsing fails", async () => {
+    const response = new Response("not json", {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Encoding": "gzip",
+      },
+    });
+
+    try {
+      await readJsonResponse(response, "test response");
+      throw new Error("Expected readJsonResponse to throw");
+    } catch (err: any) {
+      expect(err.message).toContain("test response parse failed");
+      expect(err.message).toContain("status: 200");
+      expect(err.message).toContain("contentType: application/json");
+      expect(err.message).toContain("contentEncoding: gzip");
+      expect(err.message).toContain("bodyPreview: not json");
+    }
   });
 });
 
