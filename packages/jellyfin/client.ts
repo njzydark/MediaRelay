@@ -26,6 +26,7 @@ import type { ItemsApiResponse, MediaSources, MediaStreams, User } from "./types
 
 const PLAYBACK_INFO_RE = /(?:^|\/)Items\/[^/]+\/PlaybackInfo\/?$/;
 const STREAM_RE = /(?:^|\/)Videos\/[^/]+\/stream\/?$/;
+const AUDIO_STREAM_RE = /(?:^|\/)Audio\/[^/]+\/(?:stream(?:\.[^/]*)?|universal)\/?$/;
 const DOWNLOAD_RE = /(?:^|\/)Items\/[^/]+\/Download\/?$/;
 
 export interface JellyfinConfig {
@@ -81,7 +82,7 @@ export class JellyfinClient implements MediaServer {
 
   getCommonDataFromRequest = (req: Request) => {
     const basic = getCommonDataFromRequest(req);
-    const itemId = (basic.url.pathname.match(/\/?(Items|Videos)\/((\d|\w)+)\//)?.[2]) ||
+    const itemId = (basic.url.pathname.match(/\/?(Items|Videos|Audio)\/((\d|\w)+)\//)?.[2]) ||
       basic.url.searchParams.get("ItemId") || "";
     const mediaSourceId = basic.url.searchParams.get("MediaSourceId");
     const finalItemId = String(
@@ -209,7 +210,7 @@ export class JellyfinClient implements MediaServer {
       action = "rewritePlaybackInfo";
     } else if (path.includes("/http") && search.includes("FakeDirectStream")) {
       action = "redirectDirectUrl";
-    } else if (STREAM_RE.test(path)) {
+    } else if (STREAM_RE.test(path) || AUDIO_STREAM_RE.test(path)) {
       action = "rewriteStream";
     } else if (DOWNLOAD_RE.test(path)) {
       action = "rewriteDownload";
