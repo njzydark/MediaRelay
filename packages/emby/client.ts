@@ -20,6 +20,7 @@ import type { ItemsApiResponse, MediaSources, MediaStreams, User } from "./types
 
 const PLAYBACK_INFO_RE = /(?:^|\/)(?:emby\/)?Items\/[^/]+\/PlaybackInfo\/?$/;
 const STREAM_RE = /(?:^|\/)(?:emby\/)?Videos\/[^/]+\/stream\/?$/;
+const AUDIO_STREAM_RE = /(?:^|\/)(?:emby\/)?Audio\/[^/]+\/(?:stream(?:\.[^/]*)?|universal)\/?$/;
 const DOWNLOAD_RE = /(?:^|\/)(?:emby\/)?Items\/[^/]+\/Download\/?$/;
 
 export interface EmbyConfig {
@@ -75,7 +76,7 @@ export class EmbyClient implements MediaServer {
 
   getCommonDataFromRequest = (req: Request) => {
     const basic = getCommonDataFromRequest(req);
-    const itemId = (basic.url.pathname.match(/\/?(Items|Videos)\/(\d+)\//)?.[2]) ||
+    const itemId = (basic.url.pathname.match(/\/?(Items|Videos|Audio)\/(\d+)\//)?.[2]) ||
       basic.url.searchParams.get("ItemId") || "";
     const mediaSourceId = basic.url.searchParams.get("MediaSourceId");
     const finalItemId = String(
@@ -204,7 +205,7 @@ export class EmbyClient implements MediaServer {
       action = "rewritePlaybackInfo";
     } else if (path.includes("/emby/http") && search.includes("FakeDirectStream")) {
       action = "redirectDirectUrl";
-    } else if (STREAM_RE.test(path)) {
+    } else if (STREAM_RE.test(path) || AUDIO_STREAM_RE.test(path)) {
       action = "rewriteStream";
     } else if (DOWNLOAD_RE.test(path)) {
       action = "rewriteDownload";
