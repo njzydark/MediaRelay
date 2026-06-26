@@ -230,7 +230,7 @@ export class EmbyClient implements MediaServer {
     });
 
     if (this.config.webDirect) {
-      finalInjections.unshift({ type: "script", src: "/mediarelay/emby/video-cors.js", async: true, defer: true });
+      finalInjections.unshift({ type: "script", src: "/mediarelay/emby/cors.js", async: true, defer: true });
     }
 
     if (this.config.externalPlayer?.enabled) {

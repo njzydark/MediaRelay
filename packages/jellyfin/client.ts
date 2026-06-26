@@ -235,7 +235,7 @@ export class JellyfinClient implements MediaServer {
     });
 
     if (this.config.webDirect) {
-      finalInjections.unshift({ type: "script", src: "/mediarelay/jellyfin/video-cors.js", async: true, defer: true });
+      finalInjections.unshift({ type: "script", src: "/mediarelay/jellyfin/cors.js", async: true, defer: true });
     }
 
     if (this.config.externalPlayer?.enabled) {
