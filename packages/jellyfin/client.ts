@@ -91,7 +91,8 @@ export class JellyfinClient implements MediaServer {
     const authorizationStr = basic.headers.get("authorization");
     const authorization = parseAuthHeader(authorizationStr || "");
     const userId = basic.url.searchParams.get("UserId") || "";
-    const token = basic.url.searchParams.get("Token") || authorization.token || "";
+    const token = basic.url.searchParams.get("Token") || basic.url.searchParams.get("ApiKey") || authorization.token ||
+      "";
     return { ...basic, itemId: finalItemId, mediaSourceId, token, userId };
   };
 
@@ -140,6 +141,37 @@ export class JellyfinClient implements MediaServer {
       };
     } catch (err: any) {
       this.log("error", "Error fetching user info", err.message);
+      return null;
+    }
+  };
+
+  getStreamStrmFileContent = async (req: Request) => {
+    const { itemId, mediaSourceId, token, userId } = this.getCommonDataFromRequest(req);
+    const headers = getUpstreamJsonHeaders(req);
+
+    this.log("debug", "Getting strm file content", `itemId: ${itemId}, mediaSourceId: ${mediaSourceId}`);
+
+    try {
+      headers.set("authorization", `MediaBrowser Client="Jellyfin%20Web", Token="${token}"`);
+      const response = await fetch(
+        `${this.config.baseUrl}/Videos/${itemId || mediaSourceId}/stream?MediaSourceId=${mediaSourceId}&Static=true`,
+        {
+          headers,
+        },
+      );
+      if (!response.ok) {
+        const errorText = await response.text();
+        this.log("error", "Fetch strm file content failed", `Status: ${response.status}, Body: ${errorText}`);
+        throw new Error(`HTTP Error ${response.status}: ${errorText}`);
+      }
+      const text = await response.text();
+      if (text) {
+        this.cache?.set(mediaSourceId!, text);
+        this.log("debug", "Cached media source path from strm file content", `${mediaSourceId!} -> ${text}`);
+        return text;
+      }
+    } catch (err: any) {
+      this.log("error", "Error get strm file content", err.message);
       return null;
     }
   };
@@ -338,10 +370,19 @@ export class JellyfinClient implements MediaServer {
     const { ua } = this.getCommonDataFromRequest(req);
 
     const res = await this.getMediaSourcePath(req);
-    const { Name, Path, Id, Container } = res || {};
+    const { Name, Path: _Path, Id, Container } = res || {};
+
+    let Path = _Path;
     if (!Path) {
       this.log("warn", "Stream rewrite failed: path not found");
       return null;
+    }
+
+    if (Path.endsWith(".strm")) {
+      const newPath = await this.getStreamStrmFileContent(req);
+      if (newPath) {
+        Path = newPath;
+      }
     }
 
     if (extra?.shouldRewrite) {
