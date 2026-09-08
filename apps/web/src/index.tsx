@@ -7,6 +7,7 @@ import { SettingsEntryButton } from "@/components/settings-entry-button/index.ts
 import { SettingsDialog } from "@/components/settings-dialog/index.tsx";
 import { Button } from "@/ui/button/index.tsx";
 import { isEmby, isJellyfin } from "./utils.ts";
+import { observeJellyfinUserMenu } from "./jellyfin-user-menu.tsx";
 
 const init = async (cb: (root: Root) => void) => {
   if (!document.body) {
@@ -90,8 +91,11 @@ init((root) => {
       }
     });
   } else if (isJellyfin) {
+    observeJellyfinUserMenu(root);
     const entryBtnId = "media-relay-entry-btn";
     globalThis.addEventListener("viewshow", function (e) {
+      // Modern settings pages can still emit viewshow; keep the user menu's dialog mounted.
+      if (document.getElementById("app-user-menu")) return;
       if (globalThis.location.hash.includes("/mypreferencesmenu")) {
         const detailPageElement = e.target as HTMLElement;
         const container = detailPageElement?.querySelector(".adminSection") as HTMLElement;
