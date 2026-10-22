@@ -6,3 +6,6 @@ mediarelay
 coverage
 apps/server/config
 apps/server/static
+target
+.pnpm-store
+apps/server/config.json

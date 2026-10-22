@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-/// <reference path="./types.d.ts" />
+import type {} from "./types.d.ts";
 
 import type { UserItem } from "../types.ts";
 
@@ -70,7 +70,7 @@ async function injectButtons(container: HTMLElement, playableItem: UserItem) {
     btn.title = player.name;
 
     const iconKey = (player.icon || player.name).toLowerCase();
-    const playerIcon = isUrlIcon(player.icon || "") ? player.icon : (PLAYER_ICONS[iconKey] || PLAYER_ICONS.default);
+    const playerIcon = isUrlIcon(player.icon || "") ? player.icon : PLAYER_ICONS[iconKey] || PLAYER_ICONS.default;
 
     const iconHtml = isUrlIcon(playerIcon || "")
       ? `<img src="${playerIcon}" style="width:100%;height:100%;object-fit:contain;" />`
@@ -96,34 +96,33 @@ async function injectButtons(container: HTMLElement, playableItem: UserItem) {
       const allSubtitles = currentMediaSource?.MediaStreams?.reduce(
         (acc, item) => {
           if (item.IsExternal === true && item.SupportsExternalStream === true && item.Type === "Subtitle") {
-            const url =
-              `${globalThis.location.origin}/emby/Videos/${Id}/${mediaSourceId}/Subtitles/${item.Index}/Stream.${item.Codec}?X-Emby-Token=${globalThis.ApiClient._userAuthInfo.AccessToken}`;
+            const url = `${globalThis.location.origin}/emby/Videos/${Id}/${mediaSourceId}/Subtitles/${item.Index}/Stream.${item.Codec}?X-Emby-Token=${globalThis.ApiClient._userAuthInfo.AccessToken}`;
             acc.push({
               url,
               title: item.DisplayTitle || "",
               Index: item.Index,
-              isDefault: item.Index?.toString() === subtitlesSelecctValue || item.IsDefault ||
+              isDefault:
+                item.Index?.toString() === subtitlesSelecctValue ||
+                item.IsDefault ||
                 item.Index === currentMediaSource.DefaultSubtitleStreamIndex,
             });
           }
           return acc;
         },
-        [] as ({
+        [] as {
           url: string;
           title: string;
           Index: number;
           isDefault: boolean;
-        })[],
+        }[],
       )?.sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
 
       let titleIndex = "";
       if (ParentIndexNumber >= 0 && IndexNumber >= 0) {
         titleIndex = `S${ParentIndexNumber}:E${IndexNumber}`;
       }
-      const title = [SeriesName, SeasonName, Name, titleIndex].filter(Boolean).join(" ") ||
-        "Video";
-      const videoUrl =
-        `${globalThis.location.origin}/Videos/${Id}/stream?MediaSourceId=${mediaSourceId}&Static=true&FakeDirectStream=true&X-Emby-Token=${globalThis.ApiClient._userAuthInfo.AccessToken}`;
+      const title = [SeriesName, SeasonName, Name, titleIndex].filter(Boolean).join(" ") || "Video";
+      const videoUrl = `${globalThis.location.origin}/Videos/${Id}/stream?MediaSourceId=${mediaSourceId}&Static=true&FakeDirectStream=true&X-Emby-Token=${globalThis.ApiClient._userAuthInfo.AccessToken}`;
       const playbackPositionTicks = UserData?.PlaybackPositionTicks || 0;
       const startSeconds = playbackPositionTicksToSeconds(playbackPositionTicks);
       console.log({ title, videoUrl, allSubtitles, startSeconds, mediaSourceSelectValue, subtitlesSelecctValue });

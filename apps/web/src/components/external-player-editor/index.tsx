@@ -38,6 +38,9 @@ const EmptyPlayer = (): ExternalPlayer => ({
   iconOnly: false,
 });
 
+const emptyConfig: ExternalPlayerConfig = { enabled: false };
+const emptyPlayers: ExternalPlayer[] = [];
+
 export const ExternalPlayerEditor = ({ value, onChange, disabled }: Props) => {
   const { t } = useTranslation();
   const [activePlatform, setActivePlatform] = useState<Platform>("common");
@@ -45,14 +48,17 @@ export const ExternalPlayerEditor = ({ value, onChange, disabled }: Props) => {
   const [editForm, setEditForm] = useState<ExternalPlayer>(EmptyPlayer());
   const [newPlayer, setNewPlayer] = useState<ExternalPlayer>(EmptyPlayer());
 
-  const config = value || { enabled: false };
-  const currentPlayers = config[activePlatform] || [];
+  const config = value || emptyConfig;
+  const currentPlayers = config[activePlatform] || emptyPlayers;
 
   const platforms: Platform[] = ["common", "windows", "macos", "linux", "android", "ios"];
 
-  const handleEnabledChange = useCallback((enabled: boolean) => {
-    onChange?.({ ...config, enabled });
-  }, [config, onChange]);
+  const handleEnabledChange = useCallback(
+    (enabled: boolean) => {
+      onChange?.({ ...config, enabled });
+    },
+    [config, onChange],
+  );
 
   const handleAdd = useCallback(() => {
     if (!newPlayer.name.trim() || !newPlayer.scheme.trim()) return;
@@ -65,12 +71,15 @@ export const ExternalPlayerEditor = ({ value, onChange, disabled }: Props) => {
     setNewPlayer(EmptyPlayer());
   }, [newPlayer, currentPlayers, config, activePlatform, onChange]);
 
-  const handleEdit = useCallback((index: number) => {
-    const player = currentPlayers[index];
-    if (!player) return;
-    setEditingIndex(index);
-    setEditForm({ ...player });
-  }, [currentPlayers]);
+  const handleEdit = useCallback(
+    (index: number) => {
+      const player = currentPlayers[index];
+      if (!player) return;
+      setEditingIndex(index);
+      setEditForm({ ...player });
+    },
+    [currentPlayers],
+  );
 
   const handleSaveEdit = useCallback(() => {
     if (!editForm.name.trim() || !editForm.scheme.trim()) return;
@@ -93,13 +102,16 @@ export const ExternalPlayerEditor = ({ value, onChange, disabled }: Props) => {
     setEditForm(EmptyPlayer());
   }, []);
 
-  const handleRemove = useCallback((index: number) => {
-    const newPlayers = currentPlayers.filter((_, i) => i !== index);
-    onChange?.({
-      ...config,
-      [activePlatform]: newPlayers,
-    });
-  }, [currentPlayers, config, activePlatform, onChange]);
+  const handleRemove = useCallback(
+    (index: number) => {
+      const newPlayers = currentPlayers.filter((_, i) => i !== index);
+      onChange?.({
+        ...config,
+        [activePlatform]: newPlayers,
+      });
+    },
+    [currentPlayers, config, activePlatform, onChange],
+  );
 
   return (
     <div className={styles.Container}>
@@ -131,59 +143,57 @@ export const ExternalPlayerEditor = ({ value, onChange, disabled }: Props) => {
           <div className={styles.PlayerList}>
             {currentPlayers.map((player, index) => (
               <div key={index} className={styles.PlayerItem}>
-                {editingIndex === index
-                  ? (
-                    <>
-                      <div className={styles.ItemEditing}>
-                        <Input
-                          value={editForm.name}
-                          onChange={(v) => setEditForm((prev) => ({ ...prev, name: v }))}
-                          placeholder={t("externalPlayer.form.namePlaceholder")}
-                          disabled={disabled}
-                        />
-                        <Input
-                          value={editForm.scheme}
-                          onChange={(v) => setEditForm((prev) => ({ ...prev, scheme: v }))}
-                          placeholder={t("externalPlayer.form.schemePlaceholder")}
-                          disabled={disabled}
-                        />
-                        <Input
-                          value={editForm.icon || ""}
-                          onChange={(v) => setEditForm((prev) => ({ ...prev, icon: v }))}
-                          placeholder={t("externalPlayer.form.iconPlaceholder")}
-                          disabled={disabled}
-                        />
-                      </div>
-                      <div className={styles.ItemActions}>
-                        <Button onClick={handleCancelEdit} disabled={disabled} title={t("common.cancel")}>
-                          <XIcon />
-                        </Button>
-                        <Button
-                          onClick={handleSaveEdit}
-                          disabled={disabled || !editForm.name.trim() || !editForm.scheme.trim()}
-                          title={t("common.save")}
-                        >
-                          <CheckIcon />
-                        </Button>
-                      </div>
-                    </>
-                  )
-                  : (
-                    <>
-                      <div className={styles.PlayerInfo}>
-                        <span className={styles.PlayerName}>{player.name}</span>
-                        <span className={styles.PlayerScheme}>{player.scheme}</span>
-                      </div>
-                      <div className={styles.PlayerActions}>
-                        <Button onClick={() => handleRemove(index)} disabled={disabled} title={t("common.delete")}>
-                          <TrashIcon />
-                        </Button>
-                        <Button onClick={() => handleEdit(index)} disabled={disabled} title={t("common.edit")}>
-                          <EditIcon />
-                        </Button>
-                      </div>
-                    </>
-                  )}
+                {editingIndex === index ? (
+                  <>
+                    <div className={styles.ItemEditing}>
+                      <Input
+                        value={editForm.name}
+                        onChange={(v) => setEditForm((prev) => ({ ...prev, name: v }))}
+                        placeholder={t("externalPlayer.form.namePlaceholder")}
+                        disabled={disabled}
+                      />
+                      <Input
+                        value={editForm.scheme}
+                        onChange={(v) => setEditForm((prev) => ({ ...prev, scheme: v }))}
+                        placeholder={t("externalPlayer.form.schemePlaceholder")}
+                        disabled={disabled}
+                      />
+                      <Input
+                        value={editForm.icon || ""}
+                        onChange={(v) => setEditForm((prev) => ({ ...prev, icon: v }))}
+                        placeholder={t("externalPlayer.form.iconPlaceholder")}
+                        disabled={disabled}
+                      />
+                    </div>
+                    <div className={styles.ItemActions}>
+                      <Button onClick={handleCancelEdit} disabled={disabled} title={t("common.cancel")}>
+                        <XIcon />
+                      </Button>
+                      <Button
+                        onClick={handleSaveEdit}
+                        disabled={disabled || !editForm.name.trim() || !editForm.scheme.trim()}
+                        title={t("common.save")}
+                      >
+                        <CheckIcon />
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className={styles.PlayerInfo}>
+                      <span className={styles.PlayerName}>{player.name}</span>
+                      <span className={styles.PlayerScheme}>{player.scheme}</span>
+                    </div>
+                    <div className={styles.PlayerActions}>
+                      <Button onClick={() => handleRemove(index)} disabled={disabled} title={t("common.delete")}>
+                        <TrashIcon />
+                      </Button>
+                      <Button onClick={() => handleEdit(index)} disabled={disabled} title={t("common.edit")}>
+                        <EditIcon />
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
             {currentPlayers.length === 0 && <div className={styles.Empty}>{t("externalPlayer.empty")}</div>}

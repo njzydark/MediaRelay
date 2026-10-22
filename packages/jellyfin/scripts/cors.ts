@@ -20,8 +20,10 @@ const isRedirectedMediaUrl = (value: string) => {
 
   try {
     const url = new URL(value, globalThis.location.href);
-    return url.searchParams.has("FakeDirectStream") ||
-      /\/(?:Videos|Audio)\/[^/]+\/(?:stream(?:\.[^/]*)?|universal)\/?$/i.test(url.pathname);
+    return (
+      url.searchParams.has("FakeDirectStream") ||
+      /\/(?:Videos|Audio)\/[^/]+\/(?:stream(?:\.[^/]*)?|universal)\/?$/i.test(url.pathname)
+    );
   } catch {
     return false;
   }
@@ -55,7 +57,8 @@ const originalSetAttribute = Element.prototype.setAttribute;
 Element.prototype.setAttribute = function (this: Element, ...args: string[]) {
   const name = args[0];
   if (
-    typeof name === "string" && name.toLowerCase() === "crossorigin" &&
+    typeof name === "string" &&
+    name.toLowerCase() === "crossorigin" &&
     (this.tagName === "VIDEO" || this.tagName === "AUDIO")
   ) {
     console.log(`[Bypass] Blocked setAttribute crossorigin on ${this.tagName}`);

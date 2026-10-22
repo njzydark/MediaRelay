@@ -1,0 +1,26 @@
+{
+  "name": "@mediarelay/web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "rsbuild dev --open",
+    "build": "rsbuild build",
+    "preview": "rsbuild preview"
+  },
+  "dependencies": {
+    "@base-ui/react": "1.1.0",
+    "@lib/shared": "workspace:*",
+    "classnames": "2.5.1",
+    "dayjs": "1.11.19",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@rsbuild/core": "1.7.3",
+    "@rsbuild/plugin-less": "1.6.0",
+    "@rsbuild/plugin-react": "1.4.5",
+    "@types/react": "19.2.13",
+    "@types/react-dom": "19.2.3"
+  }
+}

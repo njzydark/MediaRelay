@@ -17,12 +17,7 @@ type Props = {
 
 export const RadioGroup = ({ value, onChange, options, disabled }: Props) => {
   return (
-    <RawRadioGroup
-      className={styles.RadioGroup}
-      value={value}
-      onValueChange={onChange}
-      disabled={disabled}
-    >
+    <RawRadioGroup className={styles.RadioGroup} value={value} onValueChange={onChange} disabled={disabled}>
       {options.map((option) => (
         <label key={option.value} className={styles.RadioLabel}>
           <RawRadio.Root value={option.value} className={styles.Radio}>

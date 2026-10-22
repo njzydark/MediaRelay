@@ -10,9 +10,7 @@ export const Alert = ({ content }: Props) => {
   return (
     <div className={styles.HelpText}>
       <AlertIcon className={styles.AlertIcon} />
-      <span>
-        {content}
-      </span>
+      <span>{content}</span>
     </div>
   );
 };

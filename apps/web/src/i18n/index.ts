@@ -1,10 +1,6 @@
 import { useCallback } from "react";
 import zh from "./zh.json" with { type: "json" };
 
-const translations = {
-  zh,
-};
-
 type NestedKeyOf<ObjectType extends object> = {
   [Key in keyof ObjectType & (string | number)]: ObjectType[Key] extends object
     ? `${Key}` | `${Key}.${NestedKeyOf<ObjectType[Key]>}`

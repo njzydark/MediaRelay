@@ -107,110 +107,99 @@ export const CacheManager = ({
         </div>
       </div>
 
-      {cacheInfo && cacheInfo.groups.length > 0
-        ? (
-          <div className={styles.CacheList}>
-            <div className={styles.ListHeader}>
-              <span className={styles.ListTitle}>{t("cache.list.title")}</span>
-              <Button
-                onClick={() => onClearCache()}
-                disabled={isLoading}
-                primay
-                borderless
-              >
-                {t("cache.list.clearAll")}
-              </Button>
-            </div>
+      {cacheInfo && cacheInfo.groups.length > 0 ? (
+        <div className={styles.CacheList}>
+          <div className={styles.ListHeader}>
+            <span className={styles.ListTitle}>{t("cache.list.title")}</span>
+            <Button onClick={() => onClearCache()} disabled={isLoading} primay borderless>
+              {t("cache.list.clearAll")}
+            </Button>
+          </div>
 
-            <div className={styles.Groups}>
-              {[...cacheInfo.groups]
-                .sort((a, b) => {
-                  const aMax = Math.max(...a.entries.map((e) => e.expiresAt));
-                  const bMax = Math.max(...b.entries.map((e) => e.expiresAt));
-                  return bMax - aMax;
-                })
-                .map((group) => {
-                  const isExpanded = expandedPaths.has(group.path);
-                  const decodedPath = decodeURIComponent(group.path);
+          <div className={styles.Groups}>
+            {[...cacheInfo.groups]
+              .sort((a, b) => {
+                const aMax = Math.max(...a.entries.map((e) => e.expiresAt));
+                const bMax = Math.max(...b.entries.map((e) => e.expiresAt));
+                return bMax - aMax;
+              })
+              .map((group) => {
+                const isExpanded = expandedPaths.has(group.path);
+                const decodedPath = decodeURIComponent(group.path);
 
-                  return (
-                    <div key={group.path} className={styles.Group}>
-                      <div className={styles.Content}>
-                        <span
-                          onClick={() => togglePath(group.path)}
-                          className={`${styles.Chevron} ${isExpanded ? styles.Expanded : ""}`}
-                        >
-                          ›
-                        </span>
-                        <Tooltip content={decodedPath}>
-                          <span className={styles.Path}>{decodedPath}</span>
-                        </Tooltip>
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onClearCache(group.path);
-                          }}
-                          disabled={isLoading}
-                          title={t("cache.actions.clearPath")}
-                        >
-                          {group.entries.length}
-                        </Button>
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onClearCache(group.path);
-                          }}
-                          disabled={isLoading}
-                          title={t("cache.actions.clearPath")}
-                        >
-                          <TrashIcon />
-                        </Button>
-                      </div>
-                      {isExpanded && (
-                        <div className={styles.SubContent}>
-                          {[...group.entries]
-                            .sort((a, b) => b.expiresAt - a.expiresAt)
-                            .map((entry) => (
-                              <div key={entry.ua} className={styles.Entry}>
-                                <div className={styles.EntryInfo}>
-                                  <Tooltip content={entry.ua || "(default)"}>
-                                    <span className={styles.EntryUa}>
-                                      {entry.ua}
-                                    </span>
-                                  </Tooltip>
-                                  <Tooltip content={entry.url}>
-                                    <span className={styles.EntryUrl}>
-                                      {entry.url}
-                                    </span>
-                                  </Tooltip>
-                                </div>
-                                <div className={styles.EntryMeta}>
-                                  <Button>{formatExpiresAt(entry.expiresAt)}</Button>
-                                  <Button
-                                    onClick={() => onClearCache(group.path, entry.ua)}
-                                    disabled={isLoading}
-                                    title={t("cache.actions.clearEntry")}
-                                  >
-                                    <TrashIcon />
-                                  </Button>
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                      )}
+                return (
+                  <div key={group.path} className={styles.Group}>
+                    <div className={styles.Content}>
+                      <span
+                        onClick={() => togglePath(group.path)}
+                        className={`${styles.Chevron} ${isExpanded ? styles.Expanded : ""}`}
+                      >
+                        ›
+                      </span>
+                      <Tooltip content={decodedPath}>
+                        <span className={styles.Path}>{decodedPath}</span>
+                      </Tooltip>
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onClearCache(group.path);
+                        }}
+                        disabled={isLoading}
+                        title={t("cache.actions.clearPath")}
+                      >
+                        {group.entries.length}
+                      </Button>
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onClearCache(group.path);
+                        }}
+                        disabled={isLoading}
+                        title={t("cache.actions.clearPath")}
+                      >
+                        <TrashIcon />
+                      </Button>
                     </div>
-                  );
-                })}
-            </div>
+                    {isExpanded && (
+                      <div className={styles.SubContent}>
+                        {[...group.entries]
+                          .sort((a, b) => b.expiresAt - a.expiresAt)
+                          .map((entry) => (
+                            <div key={entry.ua} className={styles.Entry}>
+                              <div className={styles.EntryInfo}>
+                                <Tooltip content={entry.ua || "(default)"}>
+                                  <span className={styles.EntryUa}>{entry.ua}</span>
+                                </Tooltip>
+                                <Tooltip content={entry.url}>
+                                  <span className={styles.EntryUrl}>{entry.url}</span>
+                                </Tooltip>
+                              </div>
+                              <div className={styles.EntryMeta}>
+                                <Button>{formatExpiresAt(entry.expiresAt)}</Button>
+                                <Button
+                                  onClick={() => onClearCache(group.path, entry.ua)}
+                                  disabled={isLoading}
+                                  title={t("cache.actions.clearEntry")}
+                                >
+                                  <TrashIcon />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
           </div>
-        )
-        : (
-          <div className={styles.Empty}>
-            <div className={styles.EmptyIcon}>📭</div>
-            <div className={styles.EmptyText}>{t("cache.empty.title")}</div>
-            <div className={styles.EmptySubtext}>{t("cache.empty.description")}</div>
-          </div>
-        )}
+        </div>
+      ) : (
+        <div className={styles.Empty}>
+          <div className={styles.EmptyIcon}>📭</div>
+          <div className={styles.EmptyText}>{t("cache.empty.title")}</div>
+          <div className={styles.EmptySubtext}>{t("cache.empty.description")}</div>
+        </div>
+      )}
     </div>
   );
 };

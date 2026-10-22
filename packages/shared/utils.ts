@@ -1,38 +1,24 @@
 export function isWebBrowser(ua: string): boolean {
   const lowerUA = ua.toLowerCase().trim() || "chrome";
 
-  const isApp = [
-    "emby",
-    "infuse",
-    "conflux",
-    "vlc",
-    "filmly",
-    "vidhub",
-    "senplayer",
-    "mpv",
-  ].some(
-    (item) => {
-      return lowerUA.includes(item.toLowerCase());
-    },
-  );
+  const isApp = ["emby", "infuse", "conflux", "vlc", "filmly", "vidhub", "senplayer", "mpv"].some((item) => {
+    return lowerUA.includes(item.toLowerCase());
+  });
 
-  const hasBrowserFeatures = ["mozilla", "chrome", "safari", "firefox"].some(
-    (item) => {
-      return lowerUA.includes(item.toLowerCase());
-    },
-  );
+  const hasBrowserFeatures = ["mozilla", "chrome", "safari", "firefox"].some((item) => {
+    return lowerUA.includes(item.toLowerCase());
+  });
 
   return hasBrowserFeatures && !isApp;
 }
 
 export function getPlatform() {
-  const ua = globalThis?.navigator?.userAgent?.toLowerCase();
+  const ua = globalThis.navigator?.userAgent?.toLowerCase() || "";
 
   if (ua.includes("android")) return "android";
   if (ua.includes("iphone")) return "ios";
 
-  // @ts-ignore: maxTouchPoints is not recognized
-  const maxTouchPoints = globalThis?.navigator?.maxTouchPoints || 0;
+  const maxTouchPoints = globalThis.navigator?.maxTouchPoints || 0;
   const isIpad = ua.includes("ipad") || (ua.includes("macintosh") && maxTouchPoints > 1);
   if (isIpad) return "ios";
 
@@ -61,9 +47,7 @@ export function calculateMaxAgeMs(t: any, n = Date.now()) {
 
 export function getRequestRealIP(req: Request): string {
   const headers = req.headers;
-  const ipFromHeaders = headers.get("x-real-ip") ||
-    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    "";
+  const ipFromHeaders = headers.get("x-real-ip") || headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "";
   return ipFromHeaders;
 }
 
@@ -112,16 +96,19 @@ export async function readJsonResponse<T>(response: Response, context = "JSON re
       `bodyPreview: ${preview}`,
     ].join(", ");
 
-    throw new Error(`${context} parse failed: ${err.message}; ${details}`);
+    throw new Error(`${context} parse failed: ${err.message}; ${details}`, { cause: err });
   }
 }
 
-export function playbackPositionTicksToSeconds(ticks: number, options?: {
-  /**
-   * @default 3
-   */
-  fractionDigits?: number;
-}): string {
+export function playbackPositionTicksToSeconds(
+  ticks: number,
+  options?: {
+    /**
+     * @default 3
+     */
+    fractionDigits?: number;
+  },
+): string {
   const fractionDigits = options?.fractionDigits ?? 3;
 
   if (typeof ticks !== "number" || isNaN(ticks)) {

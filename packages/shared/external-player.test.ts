@@ -1,5 +1,5 @@
-import { describe, it } from "@std/testing/bdd";
-import { expect } from "@std/expect";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { defaultPlatformPlayers, transformExternalPlayerScheme } from "./external-player.ts";
 
 describe("transformExternalPlayerScheme", () => {
@@ -10,7 +10,7 @@ describe("transformExternalPlayerScheme", () => {
   it("keeps $url encoded for query based schemes", () => {
     const result = transformExternalPlayerScheme("vlc://weblink?url=$url", { videoUrl });
 
-    expect(result).toBe(`vlc://weblink?url=${encodeURIComponent(videoUrl)}`);
+    assert.equal(result, `vlc://weblink?url=${encodeURIComponent(videoUrl)}`);
   });
 
   it("supports raw and encoded url variables", () => {
@@ -19,7 +19,8 @@ describe("transformExternalPlayerScheme", () => {
       { videoUrl },
     );
 
-    expect(result).toBe(
+    assert.equal(
+      result,
       `player://open?raw=${videoUrl}&url=${encodeURI(videoUrl)}&component=${encodeURIComponent(videoUrl)}`,
     );
   });
@@ -34,10 +35,11 @@ describe("transformExternalPlayerScheme", () => {
       },
     );
 
-    expect(result).toBe(
-      `player://open?title=测试标题 01&titleUrl=${encodeURI("测试标题 01")}&titleComponent=${
-        encodeURIComponent("测试标题 01")
-      }&sub=${subtitleUrl}&subUrl=${encodeURI(subtitleUrl)}&subComponent=${encodeURIComponent(subtitleUrl)}`,
+    assert.equal(
+      result,
+      `player://open?title=测试标题 01&titleUrl=${encodeURI("测试标题 01")}&titleComponent=${encodeURIComponent(
+        "测试标题 01",
+      )}&sub=${subtitleUrl}&subUrl=${encodeURI(subtitleUrl)}&subComponent=${encodeURIComponent(subtitleUrl)}`,
     );
   });
 
@@ -50,10 +52,11 @@ describe("transformExternalPlayerScheme", () => {
       title: "测试标题 01",
     });
 
-    expect(result).toBe(
-      `potplayer://${encodeURI(videoUrlWithUnsafeChars)} /sub=${
-        encodeURI(subtitleUrl)
-      } /seek=3661.9 /title="测试标题 01"`,
+    assert.equal(
+      result,
+      `potplayer://${encodeURI(videoUrlWithUnsafeChars)} /sub=${encodeURI(
+        subtitleUrl,
+      )} /seek=3661.9 /title="测试标题 01"`,
     );
   });
 
@@ -61,7 +64,7 @@ describe("transformExternalPlayerScheme", () => {
     const scheme = defaultPlatformPlayers.windows?.[0].scheme || "";
     const result = transformExternalPlayerScheme(scheme, { videoUrl: videoUrlWithUnsafeChars });
 
-    expect(result).toBe(`potplayer://${encodeURI(videoUrlWithUnsafeChars)} /seek=0`);
+    assert.equal(result, `potplayer://${encodeURI(videoUrlWithUnsafeChars)} /seek=0`);
   });
 
   it("keeps custom PotPlayer schemes with URI encoding", () => {
@@ -69,7 +72,7 @@ describe("transformExternalPlayerScheme", () => {
       videoUrl: videoUrlWithUnsafeChars,
     });
 
-    expect(result).toBe(`potplayer:${encodeURI(videoUrlWithUnsafeChars)}`);
+    assert.equal(result, `potplayer:${encodeURI(videoUrlWithUnsafeChars)}`);
   });
 
   it("keeps custom PotPlayer schemes with slashes", () => {
@@ -77,6 +80,6 @@ describe("transformExternalPlayerScheme", () => {
       videoUrl: videoUrlWithUnsafeChars,
     });
 
-    expect(result).toBe(`potplayer://${encodeURI(videoUrlWithUnsafeChars)}`);
+    assert.equal(result, `potplayer://${encodeURI(videoUrlWithUnsafeChars)}`);
   });
 });

@@ -1,18 +1,13 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": [
-      "ESNext",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "jsxImportSource": "react",
     "strict": true,
     "paths": {
       "@/*": ["./src/*"],
-      "@lib/shared": [
-        "../../packages/shared/mod.ts"
-      ]
+      "@lib/shared": ["../../packages/shared/mod.ts"]
     }
   }
 }
