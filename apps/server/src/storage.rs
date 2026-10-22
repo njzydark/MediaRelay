@@ -8,7 +8,9 @@ use crate::{
     cache::Cache,
     config::{Config, http_url},
     context::{decode, string},
-    logs::{Logs, now_ms},
+    logs::{Logs, content_encoding, content_type, now_ms, safe_path},
+    media::RequestInfo,
+    upstream,
 };
 
 type Key = (String, String);
@@ -57,8 +59,36 @@ impl Storage {
         raw_path: &str,
         ua: &str,
     ) -> Option<String> {
+        self.resolve(config, raw_path, ua, json!({"requestId": 0}))
+            .await
+    }
+
+    pub async fn direct_url_for(
+        &self,
+        config: Arc<Config>,
+        path: &str,
+        request: &RequestInfo,
+    ) -> Option<String> {
+        self.resolve(config, path, request.ua(), request.details(json!({})))
+            .await
+    }
+
+    async fn resolve(
+        &self,
+        config: Arc<Config>,
+        raw_path: &str,
+        ua: &str,
+        mut details: Value,
+    ) -> Option<String> {
         let path = decode(raw_path);
+        details["operation"] = "openlist".into();
+        details["path"] = safe_path(&path).into();
+        details["userAgent"] = safe_path(ua).into();
+        details["generation"] = config.generation.into();
         if path.is_empty() {
+            details["reason"] = "empty_media_path".into();
+            self.logs
+                .detailed("warn", "Openlist resolution skipped", details);
             return None;
         }
         self.invalidate(config.generation);
@@ -68,16 +98,28 @@ impl Storage {
         let mut receiver = {
             let mut inner = self.inner.lock();
             if config.generation < inner.generation {
+                details["reason"] = "stale_config_snapshot".into();
+                self.logs
+                    .detailed("debug", "Openlist resolution skipped", details);
                 return None;
             }
             if cache_enabled && let Some(url) = inner.cache.get(&key) {
-                self.logs.add("debug", "Openlist direct URL cache hit");
+                self.logs
+                    .detailed("info", "Openlist direct URL cache hit", details);
                 return Some(url);
             }
             if let Some(receiver) = inner.pending.get(&key) {
+                self.logs.detailed(
+                    "debug",
+                    "Openlist request joined existing resolution",
+                    details,
+                );
                 receiver.clone()
             } else {
                 if inner.pending.len() >= 500 {
+                    details["reason"] = "pending_request_limit".into();
+                    self.logs
+                        .detailed("warn", "Openlist resolution skipped", details);
                     return None;
                 }
                 let (sender, receiver) = watch::channel(None);
@@ -86,7 +128,7 @@ impl Storage {
                 let storage = self.clone();
                 let ua = ua.to_owned();
                 tokio::spawn(async move {
-                    let result = storage.fetch(&config, &path, &ua).await;
+                    let result = storage.fetch(&config, &path, &ua, details.clone()).await;
                     {
                         let mut inner = storage.inner.lock();
                         // A configuration update or cache clear must not resurrect stale links.
@@ -99,6 +141,12 @@ impl Storage {
                             inner.pending.remove(&key);
                             if cache_enabled && let Some(url) = &result {
                                 let ttl = link_ttl(url, inner.max_age, now_ms());
+                                details["cacheTtlMs"] = ttl.into();
+                                storage.logs.detailed(
+                                    "debug",
+                                    "Openlist direct URL cache updated",
+                                    details,
+                                );
                                 inner
                                     .cache
                                     .insert(key, url.clone(), Duration::from_millis(ttl));
@@ -121,15 +169,28 @@ impl Storage {
         }
     }
 
-    async fn fetch(&self, config: &Config, path: &str, ua: &str) -> Option<String> {
+    async fn fetch(
+        &self,
+        config: &Config,
+        path: &str,
+        ua: &str,
+        mut details: Value,
+    ) -> Option<String> {
+        let started = Instant::now();
+        let mapped = transform_path(path, &config.document["openlist"]["pathMap"]);
+        details["mappedPath"] = safe_path(&mapped).into();
+        details["pathMapped"] = (mapped != path).into();
+        self.logs
+            .detailed("info", "Openlist request started", details.clone());
         let result = async {
-            let mut base = http_url(string(&config.document["openlist"], "baseUrl")).ok()?;
+            let mut base = http_url(string(&config.document["openlist"], "baseUrl"))
+                .map_err(|_| "invalid_openlist_url")?;
             base.set_path(&format!("{}/api/fs/get", base.path().trim_end_matches('/')));
             base.set_query(None);
-            let response = self
+            details["upstreamOrigin"] = base.origin().ascii_serialization().into();
+            let builder = self
                 .client
                 .post(base)
-                .timeout(Duration::from_secs(15))
                 .header(
                     "authorization",
                     string(&config.document["openlist"], "token"),
@@ -137,33 +198,51 @@ impl Storage {
                 .header("user-agent", ua)
                 .header("accept", "application/json")
                 .header("accept-encoding", "identity")
-                .json(
-                    &json!({"path": transform_path(path, &config.document["openlist"]["pathMap"])}),
-                )
-                .send()
-                .await
-                .ok()?;
+                .json(&json!({"path": mapped}));
+            let response =
+                upstream::send(&self.client, builder, &self.logs, &details, false).await?;
+            details["status"] = response.status().as_u16().into();
+            details["contentType"] = content_type(response.headers()).into();
+            details["contentEncoding"] = content_encoding(response.headers()).into();
             if !response.status().is_success() {
-                return None;
+                return Err("openlist_http_error");
             }
-            let data = crate::proxy::read_json(response).await?;
+            let data = crate::proxy::read_json_checked(response).await?;
+            // Do not log arbitrary API messages or bodies: they can contain
+            // credentials and signed URLs. The HTTP/API codes identify the stage.
+            details["apiCode"] = data["code"]
+                .as_i64()
+                .map(Value::from)
+                .unwrap_or(Value::Null);
             if data["code"] != 200 {
-                return None;
+                return Err("openlist_api_error");
             }
-            let url = data.pointer("/data/raw_url")?.as_str()?;
-            http_url(url).ok()?;
-            Some(url.to_owned())
+            let url = data
+                .pointer("/data/raw_url")
+                .and_then(Value::as_str)
+                .ok_or("missing_raw_url")?;
+            let parsed = http_url(url).map_err(|_| "invalid_raw_url")?;
+            details["destinationOrigin"] = parsed.origin().ascii_serialization().into();
+            Ok::<_, &'static str>(url.to_owned())
         }
         .await;
-        self.logs.add(
-            if result.is_some() { "info" } else { "warn" },
-            if result.is_some() {
-                "Openlist direct URL resolved"
-            } else {
-                "Openlist direct URL unavailable; falling back to upstream"
-            },
-        );
-        result
+        details["durationMs"] = (started.elapsed().as_millis() as u64).into();
+        match result {
+            Ok(url) => {
+                self.logs
+                    .detailed("info", "Openlist direct URL resolved", details);
+                Some(url)
+            }
+            Err(reason) => {
+                details["reason"] = reason.into();
+                self.logs.detailed(
+                    "warn",
+                    "Openlist direct URL unavailable; falling back to upstream",
+                    details,
+                );
+                None
+            }
+        }
     }
 
     pub fn info(&self) -> Value {
@@ -186,10 +265,13 @@ impl Storage {
 
     pub fn clear(&self, path: &str, ua: &str) {
         let mut inner = self.inner.lock();
+        let previous = inner.cache.entries.len();
+        let pending = inner.pending.len();
         let keep =
             |key: &Key| !((path.is_empty() || key.0 == path) && (ua.is_empty() || key.1 == ua));
         inner.cache.entries.retain(|key, _| keep(key));
         inner.pending.retain(|key, _| keep(key));
+        self.logs.detailed("info", "Openlist cache cleared", json!({"operation": "cache", "path": safe_path(path), "userAgent": safe_path(ua), "entriesRemoved": previous - inner.cache.entries.len(), "pendingDetached": pending - inner.pending.len()}));
     }
 
     pub fn set_max_age(&self, max_age: u64) {

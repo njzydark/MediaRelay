@@ -100,6 +100,20 @@ EMBY_URL=http://127.0.0.1:8096 ./target/release/mediarelay
 - 保留 ECMAScript 正则过滤语法，包括 lookaround/backreference；规则由管理员配置，应避免具有灾难性回溯的表达式。内网地址判断使用标准 IP 解析，支持 IPv6。
 - 缓存管理显示实际过期时间。直链有效期扣除三分钟预留时间，且不超过缓存最大时长；更新配置或清空缓存后，旧请求不会重新填入过期配置的直链。
 
+### STRM 与内部 API
+
+- Emby 的 PlaybackInfo/缓存中已有的 STRM 路径继续进入 pathMap → Openlist，不检查目标文件是否在本地存在，也不额外读取 STRM 文件。
+- Jellyfin 从缓存路径识别 STRM 后，通过媒体服务器读取文件内容；内容可以是 HTTP 地址或需要映射的文件路径。读取失败、内容为空或超过安全上限时，保留原路径继续尝试 Openlist，而不是直接放弃直链。
+- 保留旧版冷缓存语义：直接播放且尚无 PlaybackInfo 缓存时，媒体查询返回的未解析 STRM 先写入缓存，本次回退上游；后续请求可使用缓存路径。正常 PlaybackInfo → 播放流程不经过这一步冷缓存回退。
+- 内部媒体查询、管理员校验、STRM 和 Openlist API 按 Fetch 规则跟随重定向：301/302 的 POST、303 的非 GET/HEAD 请求转为 GET，307/308 保留方法和 body；普通代理仍原样透传重定向。
+- 内部重定向最多 20 次，共享 15 秒请求时限；跨源时移除 Authorization、Cookie 和媒体 token 头，不允许 HTTPS 降级到 HTTP。STRM 的压缩和解压后文本均限制为 64 KiB，普通媒体流不受此限制。
+
+### 排查日志
+
+终端、管理 UI 和 SSE 使用同一份日志详情。可通过 `requestId` 关联请求、缓存、STRM、Openlist、重定向与回退决策；详情包含媒体 ID、脱敏路径、pathMap 结果、HTTP 状态、Openlist API code、耗时和明确的失败原因。`RUST_LOG=mediarelay=debug` 可在终端显示缓存更新与内部重定向等调试信息；UI 可切换日志级别查看。
+
+403 会区分媒体查询/管理员校验、STRM 读取、Openlist 请求和最终上游代理阶段。服务端只能看到自身处理的响应，无法看到浏览器跳转 CDN 后收到的 403；这类情况需结合浏览器网络面板检查。日志不输出 token、Cookie、直链签名、远程媒体完整路径或响应正文。成功读取日志/SSE 不会再生成自身日志，避免递归刷屏。
+
 ### 验证
 
 ```sh
@@ -118,7 +132,7 @@ docker build -t mediarelay:rust .
 docker run --rm -e EMBY_URL=http://host.docker.internal:8096 -p 3000:3000 mediarelay:rust
 ```
 
-`apps/server/tests/fixtures/playback.json` 来自迁移基线 `fce33e1` 的原始 TS 改写逻辑，覆盖 Emby/Jellyfin、浏览器开关、音轨回退和过滤跳过。其他测试使用本地模拟上游/Openlist，覆盖字段透传、代理及并发行为，不需要网盘凭据。真实媒体服务和网盘的播放验收仍需使用自己的环境。
+`apps/server/tests/fixtures/playback.json` 来自迁移基线 `fce33e1` 的原始 TS 改写逻辑，覆盖 Emby/Jellyfin、浏览器开关、音轨回退和过滤跳过。`apps/server/tests/legacy_parity.rs` 补充完整请求序列：PlaybackInfo → 路径缓存 → STRM → pathMap → Openlist，并覆盖冷缓存、读取失败、压缩、内部 API 重定向、鉴权头透传及诊断日志。其他测试覆盖字段透传、代理及并发行为，均使用本地模拟服务，不需要网盘凭据。真实媒体服务和网盘的播放验收仍需使用自己的环境。
 
 Docker 镜像保留 `/app/config` 挂载约定，仅包含 Rust 可执行文件与静态资源，不需要 Node.js/Deno。此分支的镜像工作流默认标签为 `rust`；在维护者发布之前，请先本地构建，已有 `latest` 不受影响。
 

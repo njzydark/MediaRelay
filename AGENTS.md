@@ -26,6 +26,9 @@ MediaRelay proxies Emby/Jellyfin requests and redirects media playback to Openli
 - Stream ordinary request/response bodies. Never buffer media downloads. Preserve encoded paths, duplicate query parameters, status codes, Range responses and repeated response headers.
 - Failed rewrites return the original response; failed direct-link resolution falls back to the upstream proxy.
 - Keep configuration/API field names, units and frontend asset URLs compatible. Retain unknown configuration fields.
+- Compare complete request sequences against the TS baseline `fce33e1`, not just PlaybackInfo snapshots. In particular, cached Emby STRM paths still use pathMap/Openlist; failed Jellyfin STRM reads keep the original path for Openlist. Preserve legacy cold-cache fallback separately from the warm playback path.
+- Internal API requests follow bounded Fetch-style redirects, including POST-to-GET versus method/body preservation; ordinary proxy requests do not. Strip credentials on cross-origin redirects and never downgrade HTTPS.
+- Diagnostic log details must reach both tracing and the UI/SSE, include a request ID, stage, status and failure reason, and exclude credentials, remote media URL paths and response bodies. Successful log polling must not generate a recursive log feed.
 
 ## Rust Practices
 

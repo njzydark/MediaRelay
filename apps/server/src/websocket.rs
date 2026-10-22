@@ -6,6 +6,7 @@ use axum::{
 };
 use futures_util::{SinkExt, StreamExt};
 use http::{HeaderValue, StatusCode};
+use serde_json::json;
 use tokio_tungstenite::{
     connect_async,
     tungstenite::{self, client::IntoClientRequest},
@@ -25,6 +26,7 @@ pub async fn upgrade(
     info: RequestInfo,
     ws: WebSocketUpgrade,
 ) -> Result<Response> {
+    let mut details = info.details(json!({"operation": "websocket", "upstreamOrigin": config.upstream.origin().ascii_serialization()}));
     let target = proxy::target_uri(config, &info.uri)?
         .to_string()
         .replacen("http", "ws", 1);
@@ -43,12 +45,25 @@ pub async fn upgrade(
     for (key, value) in &headers {
         request.headers_mut().append(key, value.clone());
     }
-    let connection = tokio::time::timeout(Duration::from_secs(15), connect_async(request))
-        .await
-        .map_err(|_| Error::Proxy)?;
+    let connection =
+        match tokio::time::timeout(Duration::from_secs(15), connect_async(request)).await {
+            Ok(connection) => connection,
+            Err(_) => {
+                details["reason"] = "handshake_timeout".into();
+                state
+                    .logs
+                    .detailed("warn", "WebSocket handshake failed", details);
+                return Err(Error::Proxy);
+            }
+        };
     let (backend, response) = match connection {
         Ok(connection) => connection,
         Err(tungstenite::Error::Http(response)) => {
+            details["status"] = response.status().as_u16().into();
+            details["reason"] = "upstream_handshake_rejected".into();
+            state
+                .logs
+                .detailed("warn", "WebSocket handshake rejected", details);
             let (mut parts, body) = response.into_parts();
             proxy::strip_hop_headers(&mut parts.headers);
             parts.headers.remove("content-length");
@@ -57,7 +72,13 @@ pub async fn upgrade(
                 axum::body::Body::from(body.unwrap_or_default()),
             ));
         }
-        Err(_) => return Err(Error::Proxy),
+        Err(_) => {
+            details["reason"] = "upstream_connection_or_protocol_error".into();
+            state
+                .logs
+                .detailed("warn", "WebSocket handshake failed", details);
+            return Err(Error::Proxy);
+        }
     };
     let selected = response
         .headers()
@@ -71,7 +92,7 @@ pub async fn upgrade(
     };
     let shutdown = state.shutdown.clone();
     Ok(ws.on_upgrade(move |client| async move {
-        state.logs.add("debug", "WebSocket connected");
+        state.logs.detailed("debug", "WebSocket connected", details.clone());
         let (mut client_tx, mut client_rx) = client.split();
         let (mut backend_tx, mut backend_rx) = backend.split();
         loop {
@@ -94,7 +115,7 @@ pub async fn upgrade(
         }
         let _ = tokio::time::timeout(Duration::from_secs(1), client_tx.close()).await;
         let _ = tokio::time::timeout(Duration::from_secs(1), backend_tx.close()).await;
-        state.logs.add("debug", "WebSocket closed");
+        state.logs.detailed("debug", "WebSocket closed", details);
     }).into_response())
 }
 

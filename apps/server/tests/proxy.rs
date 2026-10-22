@@ -463,12 +463,22 @@ async fn jellyfin_resolves_strm_with_authorization_and_uses_media_source_cache()
         temp.path().join("config.json"),
     );
     let request = mediarelay::media::RequestInfo {
+        request_id: 0,
         uri: "/Videos/abc/stream?MediaSourceId=abc&Token=token"
             .parse()
             .unwrap(),
         headers: http::HeaderMap::new(),
         client_ip: "".into(),
     };
+    // Like the TS client, a cold STRM metadata lookup is cached but unresolved;
+    // subsequent playback can read the cached STRM path.
+    assert!(
+        app_state
+            .media
+            .stream_path(&app_state.config.snapshot(), &request)
+            .await
+            .is_none()
+    );
     for _ in 0..2 {
         let path = app_state
             .media

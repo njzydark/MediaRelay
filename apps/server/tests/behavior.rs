@@ -28,6 +28,7 @@ fn request() -> RequestInfo {
     headers.insert("host", "relay.test".parse().unwrap());
     headers.insert("user-agent", "Mozilla/5.0".parse().unwrap());
     RequestInfo {
+        request_id: 0,
         uri: "/Items/1/PlaybackInfo".parse().unwrap(),
         headers,
         client_ip: "192.168.1.2".into(),
@@ -339,6 +340,31 @@ fn logs_are_bounded_and_sequence_preserves_same_millisecond_entries() {
     assert!(logs.list(None).is_empty());
     logs.add("info", "after clear");
     assert_eq!(logs.after(cursor).len(), 1);
+}
+
+#[test]
+fn diagnostic_paths_redact_credentials_signatures_and_embedded_remote_urls() {
+    for path in [
+        "https://user:password-secret@cdn.test/signed-path-secret?sign=query-secret#fragment-secret",
+        "/emby/http://cdn.test/signed-path-secret?sign=query-secret",
+        "/http%3A%2F%2Fcdn.test%2Fsigned-path-secret%3Fsign%3Dquery-secret",
+        "//cdn.test/signed-path-secret",
+        "/media/movie.mkv?api_key=query-secret#fragment-secret",
+    ] {
+        let result = mediarelay::logs::safe_path(path);
+        for secret in [
+            "password-secret",
+            "signed-path-secret",
+            "query-secret",
+            "fragment-secret",
+        ] {
+            assert!(!result.contains(secret), "{result}");
+        }
+    }
+    assert_eq!(
+        mediarelay::logs::safe_path("/media/movie%20name.mkv"),
+        "/media/movie name.mkv"
+    );
 }
 
 #[tokio::test(start_paused = true)]

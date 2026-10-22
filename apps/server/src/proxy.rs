@@ -138,8 +138,19 @@ pub async fn buffer(response: Response, limit: usize) -> Result<Buffered> {
 }
 
 pub async fn decode_body(headers: &HeaderMap, bytes: &Bytes) -> Option<Bytes> {
+    decode_body_limited(headers, bytes, 8 * 1024 * 1024).await
+}
+
+pub async fn decode_body_limited(
+    headers: &HeaderMap,
+    bytes: &Bytes,
+    limit: usize,
+) -> Option<Bytes> {
     use async_compression::tokio::bufread::{BrotliDecoder, GzipDecoder, ZlibDecoder, ZstdDecoder};
     use tokio::io::{AsyncRead, AsyncReadExt};
+    if bytes.len() > limit {
+        return None;
+    }
     let mut decoded = bytes.clone();
     let encoding = crate::context::header(headers, "content-encoding").to_lowercase();
     for coding in encoding.split(',').map(str::trim).rev() {
@@ -153,11 +164,11 @@ pub async fn decode_body(headers: &HeaderMap, bytes: &Bytes) -> Option<Bytes> {
         };
         let mut output = Vec::new();
         reader
-            .take(8 * 1024 * 1024 + 1)
+            .take(limit as u64 + 1)
             .read_to_end(&mut output)
             .await
             .ok()?;
-        if output.len() > 8 * 1024 * 1024 {
+        if output.len() > limit {
             return None;
         }
         decoded = output.into();
@@ -198,8 +209,20 @@ pub async fn read_limited(mut response: reqwest::Response, limit: usize) -> Opti
 }
 
 pub async fn read_json(response: reqwest::Response) -> Option<serde_json::Value> {
+    read_json_checked(response).await.ok()
+}
+
+pub async fn read_json_checked(
+    response: reqwest::Response,
+) -> std::result::Result<serde_json::Value, &'static str> {
     let headers = response.headers().clone();
-    let bytes = Bytes::from(read_limited(response, 8 * 1024 * 1024).await?);
-    let decoded = decode_body(&headers, &bytes).await?;
-    serde_json::from_slice(&decoded).ok()
+    let bytes = Bytes::from(
+        read_limited(response, 8 * 1024 * 1024)
+            .await
+            .ok_or("body_read_failed_or_too_large")?,
+    );
+    let decoded = decode_body(&headers, &bytes)
+        .await
+        .ok_or("unsupported_or_invalid_content_encoding")?;
+    serde_json::from_slice(&decoded).map_err(|_| "invalid_json")
 }

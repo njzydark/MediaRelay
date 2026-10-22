@@ -5,13 +5,14 @@ use tokio::net::TcpListener;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    dotenvy::dotenv().ok();
     tracing_subscriber::fmt()
+        .with_ansi(std::io::IsTerminal::is_terminal(&std::io::stdout()))
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| "mediarelay=info".into()),
         )
         .init();
-    dotenvy::dotenv().ok();
     let dir = std::env::var_os("CONFIG_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("./config"));
@@ -21,6 +22,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let static_dir = std::env::var_os("STATIC_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("./apps/server/static"));
+    let snapshot = state.config.snapshot();
+    state.logs.detailed("info", "MediaRelay initialized", serde_json::json!({
+        "port": port, "server": format!("{:?}", snapshot.kind),
+        "upstreamOrigin": snapshot.upstream.origin().ascii_serialization(),
+        "openlistOrigin": snapshot.document.pointer("/openlist/baseUrl").and_then(serde_json::Value::as_str).and_then(|s| url::Url::parse(s).ok()).map(|u| u.origin().ascii_serialization()),
+        "configDirectory": dir.display().to_string(), "staticDirectory": static_dir.display().to_string(),
+        "webDirect": snapshot.flag("webDirect"), "webDirectLocalFallback": snapshot.flag("webDirectLocalFallback"),
+    }));
     let app = router(state.clone(), static_dir);
     let listener = TcpListener::bind((std::net::Ipv6Addr::UNSPECIFIED, port)).await?;
     state

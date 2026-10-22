@@ -6,11 +6,11 @@ use serde_json::{Value, json};
 
 use crate::{
     cache::Cache,
-    config::{Config, MediaKind, http_url},
+    config::{Config, MediaKind},
     context::{auth_token, header, is_browser, origin, query, string},
-    logs::Logs,
-    proxy::{read_limited, strip_hop_headers},
-    rules,
+    logs::{Logs, content_encoding, content_type, safe_id, safe_path},
+    proxy::{decode_body_limited, read_limited, strip_hop_headers},
+    rules, upstream,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -68,12 +68,29 @@ pub fn identify(kind: MediaKind, uri: &Uri) -> Action {
 
 #[derive(Clone)]
 pub struct RequestInfo {
+    pub request_id: u64,
     pub uri: Uri,
     pub headers: HeaderMap,
     pub client_ip: String,
 }
 
 impl RequestInfo {
+    pub fn monitoring(&self) -> bool {
+        self.uri.path().starts_with("/mediarelay/api/logs")
+    }
+
+    pub fn details(&self, mut fields: Value) -> Value {
+        fields["requestId"] = self.request_id.into();
+        fields["requestPath"] = safe_path(self.uri.path()).into();
+        fields["itemId"] = safe_id(&self.item_id()).into();
+        fields["mediaSourceId"] = safe_id(&query(&self.uri, "MediaSourceId")).into();
+        fields
+    }
+
+    pub fn log(&self, logs: &Logs, level: &str, message: &str, fields: Value) {
+        logs.detailed(level, message, self.details(fields));
+    }
+
     pub fn ua(&self) -> &str {
         header(&self.headers, "user-agent")
     }
@@ -128,13 +145,28 @@ impl RequestInfo {
         headers
     }
 
-    fn allowed(&self, config: &Config, source: &Value) -> bool {
-        !rules::blocked(
+    fn allowed(&self, config: &Config, source: &Value, logs: &Logs) -> bool {
+        let matched = rules::matched_rule(
             &config.document["filterRules"],
             &self.headers,
             &self.client_ip,
             source,
-        )
+        );
+        if let Some((index, rule)) = matched {
+            self.log(
+                logs,
+                "info",
+                "Direct playback blocked by filter rule",
+                json!({
+                    "decision": "filter_blocked", "ruleIndex": index,
+                    "ruleId": safe_id(string(rule, "id")), "logic": string(rule, "logic"),
+                    "path": safe_path(string(source, "Path")),
+                }),
+            );
+            false
+        } else {
+            true
+        }
     }
 }
 
@@ -179,12 +211,23 @@ impl Media {
         data: &mut Value,
     ) -> bool {
         if is_browser(request.ua()) && !config.flag("webDirect") {
+            request.log(
+                &self.logs,
+                "info",
+                "PlaybackInfo rewrite skipped for browser",
+                json!({"decision": "web_direct_disabled"}),
+            );
             return false;
         }
         let Some(sources) = data.get_mut("MediaSources").and_then(Value::as_array_mut) else {
             return false;
         };
         let singleton = sources.len() == 1;
+        // Emby also primes the singleton item cache when a source is skipped for
+        // web codec compatibility. Do not move this behind the rewrite checks.
+        if config.kind == MediaKind::Emby && singleton {
+            self.remember(config, &sources[0], true);
+        }
         let mut changed = false;
         for source in sources {
             let Some(object) = source.as_object() else {
@@ -196,7 +239,16 @@ impl Media {
             } else {
                 id
             };
-            if id.is_empty() || item_id.is_empty() || !request.allowed(config, source) {
+            if id.is_empty() || item_id.is_empty() {
+                request.log(
+                    &self.logs,
+                    "debug",
+                    "PlaybackInfo source skipped",
+                    json!({"reason": "missing_source_or_item_id"}),
+                );
+                continue;
+            }
+            if !request.allowed(config, source, &self.logs) {
                 continue;
             }
             if config.flag("webDirectLocalFallback")
@@ -210,6 +262,7 @@ impl Media {
                         })
                     })
             {
+                request.log(&self.logs, "info", "PlaybackInfo rewrite skipped for browser codec", json!({"decision": "web_codec_fallback", "codec": "eac3", "sourceId": safe_id(id)}));
                 continue;
             }
             let mut direct = match url::Url::parse(&format!(
@@ -226,6 +279,7 @@ impl Media {
                 .append_pair("Static", "true")
                 .append_pair("FakeDirectStream", "true");
             self.remember(config, source, singleton);
+            request.log(&self.logs, "debug", "PlaybackInfo source cached and rewritten", json!({"decision": "rewrite", "sourceId": safe_id(id), "path": safe_path(string(source, "Path")), "generation": config.generation}));
             let Some(object) = source.as_object_mut() else {
                 continue;
             };
@@ -262,8 +316,15 @@ impl Media {
                 .get(&(config.generation, source_id.clone()))
                 .or_else(|| cache.get(&(config.generation, id.clone())))
         } {
+            request.log(&self.logs, "info", "Media source cache hit", json!({"path": safe_path(string(&source, "Path")), "generation": config.generation}));
             return self.resolve_source(config, request, source, true).await;
         }
+        request.log(
+            &self.logs,
+            "debug",
+            "Media source cache miss; querying upstream",
+            json!({"operation": "media_source", "generation": config.generation}),
+        );
         let path = if config.kind == MediaKind::Emby {
             "/emby/Items"
         } else {
@@ -274,30 +335,49 @@ impl Media {
             .append_pair("Fields", "Path,MediaSources")
             .append_pair("Ids", &id);
         let mut headers = request.api_headers();
-        let token = request.token(config.kind);
         if config.kind == MediaKind::Emby {
-            url.query_pairs_mut().append_pair(
-                if query(&request.uri, "api_key").is_empty() {
-                    "X-Emby-Token"
-                } else {
-                    "api_key"
-                },
-                &token,
-            );
+            let api_key = query(&request.uri, "api_key");
+            let token = query(&request.uri, "X-Emby-Token");
+            if !api_key.is_empty() {
+                url.query_pairs_mut().append_pair("api_key", &api_key);
+            } else if !token.is_empty() {
+                url.query_pairs_mut().append_pair("X-Emby-Token", &token);
+            }
         } else {
             url.query_pairs_mut()
                 .append_pair("userId", &query(&request.uri, "UserId"));
-            set_token(&mut headers, &token)?;
+            set_token(&mut headers, &request.token(config.kind))?;
         }
-        let data = self.api_json(url, headers).await?;
-        let sources = data.pointer("/Items/0/MediaSources")?.as_array()?;
+        let data = self.api_json(url, headers, request, "media_source").await?;
+        let Some(sources) = data
+            .pointer("/Items/0/MediaSources")
+            .and_then(Value::as_array)
+        else {
+            request.log(
+                &self.logs,
+                "warn",
+                "Media source response has no sources",
+                json!({"operation": "media_source", "reason": "missing_media_sources"}),
+            );
+            return None;
+        };
         let selected = if sources.len() == 1 {
-            sources.first()?
+            sources.first()
         } else {
-            sources.iter().find(|s| s["Id"] == source_id)?
+            sources.iter().find(|s| s["Id"] == source_id)
         };
         for source in sources {
             self.remember(config, source, sources.len() == 1);
+        }
+        let Some(selected) = selected else {
+            request.log(&self.logs, "warn", "No matching media source found", json!({"operation": "media_source", "reason": "no_matching_source", "sourceCount": sources.len()}));
+            return None;
+        };
+        // The TS clients cache the metadata before rejecting an unresolved STRM
+        // on a cold lookup. Cached/PlaybackInfo paths must bypass this guard.
+        if string(selected, "Path").contains(".strm") {
+            request.log(&self.logs, "debug", "Unresolved STRM metadata cached for subsequent playback", json!({"operation": "media_source", "decision": "upstream_fallback", "reason": "cold_strm_metadata", "path": safe_path(string(selected, "Path"))}));
+            return None;
         }
         self.resolve_source(config, request, selected.clone(), sources.len() == 1)
             .await
@@ -311,9 +391,42 @@ impl Media {
         singleton: bool,
     ) -> Option<Value> {
         if string(&selected, "Path").is_empty() {
+            request.log(
+                &self.logs,
+                "warn",
+                "Media source path is empty",
+                json!({"operation": "media_source", "reason": "empty_media_path"}),
+            );
             return None;
         }
         if config.kind == MediaKind::Jellyfin && string(&selected, "Path").ends_with(".strm") {
+            if let Some(path) = self.strm_content(config, request, &selected).await {
+                selected["Path"] = path.into();
+                self.remember(config, &selected, singleton);
+            } else {
+                // A failed STRM read did not abort the legacy pipeline: pathMap
+                // may still resolve the original STRM path through Openlist.
+                request.log(&self.logs, "warn", "STRM content unavailable; retaining original path for Openlist", json!({"operation": "strm", "decision": "original_path_fallback", "path": safe_path(string(&selected, "Path"))}));
+            }
+        }
+        Some(selected)
+    }
+
+    async fn strm_content(
+        &self,
+        config: &Config,
+        request: &RequestInfo,
+        selected: &Value,
+    ) -> Option<String> {
+        let started = tokio::time::Instant::now();
+        let mut details = request.details(json!({"operation": "strm", "upstreamOrigin": config.upstream.origin().ascii_serialization(), "path": safe_path(string(selected, "Path"))}));
+        request.log(
+            &self.logs,
+            "debug",
+            "Reading STRM content from upstream",
+            details.clone(),
+        );
+        let result = async {
             let id = request.item_id();
             let token = request.token(config.kind);
             let mut url = api_url(
@@ -321,44 +434,69 @@ impl Media {
                 &format!(
                     "/Videos/{}/stream",
                     if id.is_empty() {
-                        string(&selected, "Id")
+                        string(selected, "Id")
                     } else {
                         &id
                     }
                 ),
-            )?;
+            )
+            .ok_or("invalid_upstream_url")?;
             url.query_pairs_mut()
-                .append_pair("MediaSourceId", string(&selected, "Id"))
+                .append_pair("MediaSourceId", string(selected, "Id"))
                 .append_pair("Static", "true");
             let mut headers = request.api_headers();
-            set_token(&mut headers, &token)?;
-            let response = self
-                .client
-                .get(url)
-                .headers(headers)
-                .timeout(Duration::from_secs(15))
-                .send()
-                .await
-                .ok()?;
+            set_token(&mut headers, &token).ok_or("invalid_auth_header")?;
+            let response = upstream::send(
+                &self.client,
+                self.client.get(url).headers(headers),
+                &self.logs,
+                &details,
+                false,
+            )
+            .await?;
+            details["status"] = response.status().as_u16().into();
+            details["contentType"] = content_type(response.headers()).into();
+            details["contentEncoding"] = content_encoding(response.headers()).into();
             if !response.status().is_success() {
-                return None;
+                return Err("upstream_http_error");
             }
-            let bytes = read_limited(response, 64 * 1024).await?;
-            let path = std::str::from_utf8(&bytes).ok()?.trim();
-            http_url(path).ok()?;
-            selected["Path"] = path.into();
-            self.remember(config, &selected, singleton);
-        } else if config.kind == MediaKind::Emby && string(&selected, "Path").contains(".strm") {
-            return None;
+            let headers = response.headers().clone();
+            let bytes = read_limited(response, 64 * 1024)
+                .await
+                .ok_or("body_read_failed_or_too_large")?;
+            let decoded = decode_body_limited(&headers, &bytes.into(), 64 * 1024)
+                .await
+                .ok_or("unsupported_or_invalid_content_encoding")?;
+            let path = std::str::from_utf8(&decoded)
+                .map_err(|_| "invalid_utf8")?
+                .trim();
+            if path.is_empty() {
+                return Err("empty_strm_content");
+            }
+            // STRM is not restricted to HTTP URLs: legacy pathMap accepts paths
+            // to files that do not exist on either MediaRelay or the media host.
+            Ok::<_, &'static str>(path.to_owned())
         }
-        Some(selected)
+        .await;
+        details["durationMs"] = (started.elapsed().as_millis() as u64).into();
+        match result {
+            Ok(path) => {
+                details["resolvedPath"] = safe_path(&path).into();
+                self.logs.detailed("info", "STRM content resolved", details);
+                Some(path)
+            }
+            Err(reason) => {
+                details["reason"] = reason.into();
+                self.logs
+                    .detailed("warn", "STRM content read failed", details);
+                None
+            }
+        }
     }
 
     pub async fn stream_path(&self, config: &Config, request: &RequestInfo) -> Option<String> {
         let source = self.source(config, request).await?;
-        if !request.allowed(config, &source) {
-            self.logs
-                .add("info", "Direct playback blocked by filter rule");
+        if !request.allowed(config, &source, &self.logs) {
             return None;
         }
         let path = string(&source, "Path");
@@ -372,6 +510,12 @@ impl Media {
     pub async fn is_admin(&self, config: &Config, request: &RequestInfo) -> bool {
         let user = query(&request.uri, "userId");
         if user.is_empty() {
+            request.log(
+                &self.logs,
+                "warn",
+                "Admin authorization failed",
+                json!({"operation": "admin_auth", "reason": "missing_user_id"}),
+            );
             return false;
         }
         let prefix = if config.kind == MediaKind::Emby {
@@ -392,32 +536,85 @@ impl Media {
         if config.kind == MediaKind::Emby {
             let key = query(&request.uri, "apiKey");
             if key.is_empty() {
-                url.query_pairs_mut()
-                    .append_pair("X-Emby-Token", &query(&request.uri, "token"));
+                let token = query(&request.uri, "token");
+                if !token.is_empty() {
+                    url.query_pairs_mut().append_pair("X-Emby-Token", &token);
+                }
             } else {
                 url.query_pairs_mut().append_pair("api_key", &key);
             }
         } else if set_token(&mut headers, &query(&request.uri, "token")).is_none() {
             return false;
         }
-        self.api_json(url, headers)
-            .await
-            .is_some_and(|data| data.pointer("/Policy/IsAdministrator") == Some(&Value::Bool(true)))
+        let Some(data) = self.api_json(url, headers, request, "admin_auth").await else {
+            return false;
+        };
+        let allowed = data.pointer("/Policy/IsAdministrator") == Some(&Value::Bool(true));
+        if !allowed || !request.monitoring() {
+            request.log(&self.logs, if allowed { "debug" } else { "warn" }, "Admin authorization checked", json!({"operation": "admin_auth", "userId": safe_id(&user), "allowed": allowed, "reason": if allowed { "administrator" } else { "not_administrator" }}));
+        }
+        allowed
     }
 
-    async fn api_json(&self, url: url::Url, headers: HeaderMap) -> Option<Value> {
-        let response = self
-            .client
-            .get(url)
-            .headers(headers)
-            .timeout(Duration::from_secs(15))
-            .send()
-            .await
-            .ok()?;
-        if !response.status().is_success() {
-            return None;
+    async fn api_json(
+        &self,
+        url: url::Url,
+        headers: HeaderMap,
+        request: &RequestInfo,
+        operation: &str,
+    ) -> Option<Value> {
+        let started = tokio::time::Instant::now();
+        let quiet = request.monitoring();
+        let auth_present = [
+            "authorization",
+            "x-emby-token",
+            "x-mediabrowser-token",
+            "x-emby-authorization",
+        ]
+        .iter()
+        .any(|name| !header(&headers, name).is_empty())
+            || url
+                .query_pairs()
+                .any(|(k, v)| matches!(k.as_ref(), "api_key" | "X-Emby-Token") && !v.is_empty());
+        let mut details = request.details(json!({"operation": operation, "upstreamOrigin": url.origin().ascii_serialization(), "endpoint": safe_path(url.path()), "authPresent": auth_present}));
+        if !quiet {
+            self.logs
+                .detailed("debug", "Upstream API request started", details.clone());
         }
-        crate::proxy::read_json(response).await
+        let result = async {
+            let response = upstream::send(
+                &self.client,
+                self.client.get(url).headers(headers),
+                &self.logs,
+                &details,
+                quiet,
+            )
+            .await?;
+            details["status"] = response.status().as_u16().into();
+            details["contentType"] = content_type(response.headers()).into();
+            details["contentEncoding"] = content_encoding(response.headers()).into();
+            if !response.status().is_success() {
+                return Err("upstream_http_error");
+            }
+            crate::proxy::read_json_checked(response).await
+        }
+        .await;
+        details["durationMs"] = (started.elapsed().as_millis() as u64).into();
+        match result {
+            Ok(data) => {
+                if !quiet {
+                    self.logs
+                        .detailed("debug", "Upstream API request completed", details);
+                }
+                Some(data)
+            }
+            Err(reason) => {
+                details["reason"] = reason.into();
+                self.logs
+                    .detailed("warn", "Upstream API request failed", details);
+                None
+            }
+        }
     }
 }
 

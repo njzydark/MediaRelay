@@ -6,8 +6,17 @@ use serde_json::Value;
 use crate::context::{decode, header, string};
 
 pub fn blocked(rules: &Value, headers: &HeaderMap, ip: &str, source: &Value) -> bool {
-    rules.as_array().is_some_and(|rules| {
-        rules.iter().any(|rule| {
+    matched_rule(rules, headers, ip, source).is_some()
+}
+
+pub fn matched_rule<'a>(
+    rules: &'a Value,
+    headers: &HeaderMap,
+    ip: &str,
+    source: &Value,
+) -> Option<(usize, &'a Value)> {
+    rules.as_array().and_then(|rules| {
+        rules.iter().enumerate().find(|(_, rule)| {
             if rule["enabled"] != true {
                 return false;
             }
