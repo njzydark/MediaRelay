@@ -5,8 +5,10 @@ import { advanceElapsed, copyCommand, cycleDuration, dockerCommand, scenarios, s
 describe("playback demonstration", () => {
   it("covers both local media and entries without local video files", () => {
     assert.match(scenarios.local.description, /对应副本/);
+    assert.match(scenarios.local.description, /pathMap.*Openlist/);
     assert.match(scenarios.strm.title, /没有视频实体文件/);
     assert.match(scenarios.strm.description, /STRM/);
+    assert.match(scenarios.strm.description, /解析.*按需.*路径映射.*Openlist.*直链/);
     assert.equal(Object.keys(scenarios).length, 2);
   });
 

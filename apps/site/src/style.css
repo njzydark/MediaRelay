@@ -261,46 +261,6 @@ h1 {
   min-width: 0;
   animation: enter 0.75s 0.1s ease-out both;
 }
-.scenario-switch {
-  display: flex;
-  padding: 5px;
-  background: #e9eef5;
-  border: 1px solid var(--rule);
-  border-radius: 8px;
-  gap: 3px;
-  margin-bottom: 12px;
-}
-.scenario-switch button {
-  color: var(--secondary);
-  flex: 1;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
-  padding: 10px 6px;
-  font-size: 12px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-}
-.scenario-switch button[aria-pressed="true"] {
-  background: white;
-  color: var(--ink);
-  border-color: var(--rule);
-  box-shadow: 0 2px 2px #1721330a;
-}
-.choice-dot {
-  width: 7px;
-  height: 7px;
-  border: 1px solid var(--muted);
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-[aria-pressed="true"] .choice-dot {
-  border-color: var(--blue);
-  background: var(--blue);
-}
 .flow-panel {
   border: 1px solid var(--rule-strong);
   border-radius: 16px 4px 16px 4px;
@@ -1014,10 +974,6 @@ h1 {
   .hero-footnote span + span {
     padding-left: 10px;
   }
-  .scenario-switch button {
-    font-size: 11px;
-    gap: 5px;
-  }
   .flow-topline {
     padding-inline: 12px;
     font-size: 10px;
@@ -1067,9 +1023,6 @@ h1 {
     max-width: 700px;
     width: 100%;
     justify-self: center;
-  }
-  .scenario-switch button {
-    font-size: 13px;
   }
   .diagram-desktop {
     max-height: 440px;
@@ -1218,15 +1171,6 @@ h1 {
   .hero-footnote {
     font-size: 10px;
     gap: 10px;
-  }
-  .scenario-switch {
-    padding: 4px;
-    gap: 0;
-  }
-  .scenario-switch button {
-    font-size: 11px;
-    gap: 5px;
-    padding-inline: 2px;
   }
   .diagram-desktop {
     display: none;
