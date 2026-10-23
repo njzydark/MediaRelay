@@ -453,6 +453,7 @@ async fn jellyfin_resolves_strm_with_authorization_and_uses_media_source_cache()
     let upstream = spawn(Router::new()
         .route("/Items", get(|request: Request| async move {
             assert!(request.headers()["authorization"].to_str().unwrap().contains("Token=\"token\""));
+            assert!(request.uri().query().unwrap().contains("fields=Path%2CMediaSources&ids=abc"));
             Json(json!({"Items": [{"MediaSources": [{"Id": "abc", "Path": "/movie.strm", "Container": "strm"}]}]}))
         }))
         .route("/Videos/abc/stream", get(move || { let hits = hits.clone(); async move { hits.fetch_add(1, Ordering::SeqCst); "https://strm.test/movie.mkv" } }))).await;

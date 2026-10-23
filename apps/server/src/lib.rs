@@ -179,7 +179,7 @@ async fn relay(State(state): State<AppState>, mut request: Request) -> Result<Re
                 return direct_redirect(&url);
             }
             info.log(&state.logs, "warn", "Direct URL unavailable; proxying original request upstream", json!({"decision": "upstream_fallback", "upstreamOrigin": config.upstream.origin().ascii_serialization()}));
-            proxy::forward(&state.proxy, &config, request, false).await
+            proxy::forward(&state.proxy, &config, request, false, &info, &state.logs).await
         }
         Action::Html | Action::PlaybackInfo => {
             let is_head = request.method() == Method::HEAD;
@@ -193,6 +193,8 @@ async fn relay(State(state): State<AppState>, mut request: Request) -> Result<Re
                 &config,
                 request,
                 action == Action::PlaybackInfo,
+                &info,
+                &state.logs,
             )
             .await?;
             if !response.status().is_success()
@@ -246,7 +248,9 @@ async fn relay(State(state): State<AppState>, mut request: Request) -> Result<Re
             }
             Ok(Response::from_parts(parts, Body::from(bytes)))
         }
-        Action::Direct => proxy::forward(&state.proxy, &config, request, false).await,
+        Action::Direct => {
+            proxy::forward(&state.proxy, &config, request, false, &info, &state.logs).await
+        }
     }
 }
 
@@ -315,7 +319,10 @@ async fn admin_api(State(state): State<AppState>, request: Request) -> Result<Re
         }
         (&Method::GET, "/mediarelay/api/logs") => {
             let since = context::query(&info.uri, "since").parse().ok();
-            Ok(Json(json!({"logs": state.logs.list(since)})).into_response())
+            Ok(Json(LogResponse {
+                logs: state.logs.list(since),
+            })
+            .into_response())
         }
         (&Method::DELETE, "/mediarelay/api/logs") => {
             state.logs.clear();
@@ -334,6 +341,11 @@ async fn json_body(request: Request) -> Result<Value> {
         .await
         .map_err(|_| Error::InvalidRequest)?;
     Ok(serde_json::from_slice(&bytes)?)
+}
+
+#[derive(serde::Serialize)]
+struct LogResponse {
+    logs: Vec<Arc<logs::LogEntry>>,
 }
 
 fn log_stream(state: AppState, since: Option<u64>) -> Response {

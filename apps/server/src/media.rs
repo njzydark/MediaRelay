@@ -172,7 +172,9 @@ impl RequestInfo {
 
 #[derive(Clone)]
 pub struct Media {
-    cache: Arc<Mutex<Cache<(u64, String), Value>>>,
+    // The media upstream cannot change at runtime. Settings generations only
+    // invalidate storage links, not these legacy item-to-path associations.
+    cache: Arc<Mutex<Cache<String, Arc<str>>>>,
     client: reqwest::Client,
     logs: Logs,
 }
@@ -186,20 +188,21 @@ impl Media {
         }
     }
 
-    fn remember(&self, config: &Config, source: &Value, singleton: bool) {
+    fn remember(&self, source: &Value, singleton: bool) {
         if string(source, "Path").is_empty() {
             return;
         }
+        let path: Arc<str> = string(source, "Path").into();
         let mut cache = self.cache.lock();
         let ttl = Duration::from_secs(3600);
         let id = string(source, "Id");
         if !id.is_empty() {
-            cache.insert((config.generation, id.to_owned()), source.clone(), ttl);
+            cache.insert(id.to_owned(), path.clone(), ttl);
         }
         if singleton {
             let id = string(source, "ItemId");
             if !id.is_empty() {
-                cache.insert((config.generation, id.to_owned()), source.clone(), ttl);
+                cache.insert(id.to_owned(), path, ttl);
             }
         }
     }
@@ -223,10 +226,9 @@ impl Media {
             return false;
         };
         let singleton = sources.len() == 1;
-        // Emby also primes the singleton item cache when a source is skipped for
-        // web codec compatibility. Do not move this behind the rewrite checks.
+        // Legacy Emby primes only the ItemId alias even when rewriting is skipped.
         if config.kind == MediaKind::Emby && singleton {
-            self.remember(config, &sources[0], true);
+            self.remember_item_path(string(&sources[0], "ItemId"), string(&sources[0], "Path"));
         }
         let mut changed = false;
         for source in sources {
@@ -278,7 +280,7 @@ impl Media {
                 .append_pair("MediaSourceId", id)
                 .append_pair("Static", "true")
                 .append_pair("FakeDirectStream", "true");
-            self.remember(config, source, singleton);
+            self.remember(source, false);
             request.log(&self.logs, "debug", "PlaybackInfo source cached and rewritten", json!({"decision": "rewrite", "sourceId": safe_id(id), "path": safe_path(string(source, "Path")), "generation": config.generation}));
             let Some(object) = source.as_object_mut() else {
                 continue;
@@ -310,14 +312,19 @@ impl Media {
     pub async fn source(&self, config: &Config, request: &RequestInfo) -> Option<Value> {
         let id = request.item_id();
         let source_id = query(&request.uri, "MediaSourceId");
-        if let Some(source) = {
-            let mut cache = self.cache.lock();
-            cache
-                .get(&(config.generation, source_id.clone()))
-                .or_else(|| cache.get(&(config.generation, id.clone())))
-        } {
-            request.log(&self.logs, "info", "Media source cache hit", json!({"path": safe_path(string(&source, "Path")), "generation": config.generation}));
-            return self.resolve_source(config, request, source, true).await;
+        let cached = self.cache.lock().get(&id);
+        if let Some(path) = cached {
+            request.log(
+                &self.logs,
+                "info",
+                "Media source cache hit",
+                json!({"path": safe_path(&path), "generation": config.generation}),
+            );
+            // Only Path survives a legacy cache hit. Keeping Container here would
+            // silently change mediaType filtering; retaining the full JSON wastes memory.
+            return self
+                .resolve_source(config, request, json!({"Path": &*path}))
+                .await;
         }
         request.log(
             &self.logs,
@@ -332,8 +339,22 @@ impl Media {
         };
         let mut url = api_url(config, path)?;
         url.query_pairs_mut()
-            .append_pair("Fields", "Path,MediaSources")
-            .append_pair("Ids", &id);
+            .append_pair(
+                if config.kind == MediaKind::Emby {
+                    "Fields"
+                } else {
+                    "fields"
+                },
+                "Path,MediaSources",
+            )
+            .append_pair(
+                if config.kind == MediaKind::Emby {
+                    "Ids"
+                } else {
+                    "ids"
+                },
+                &id,
+            );
         let mut headers = request.api_headers();
         if config.kind == MediaKind::Emby {
             let api_key = query(&request.uri, "api_key");
@@ -348,10 +369,10 @@ impl Media {
                 .append_pair("userId", &query(&request.uri, "UserId"));
             set_token(&mut headers, &request.token(config.kind))?;
         }
-        let data = self.api_json(url, headers, request, "media_source").await?;
+        let mut data = self.api_json(url, headers, request, "media_source").await?;
         let Some(sources) = data
-            .pointer("/Items/0/MediaSources")
-            .and_then(Value::as_array)
+            .pointer_mut("/Items/0/MediaSources")
+            .and_then(Value::as_array_mut)
         else {
             request.log(
                 &self.logs,
@@ -362,25 +383,33 @@ impl Media {
             return None;
         };
         let selected = if sources.len() == 1 {
-            sources.first()
+            Some(0)
         } else {
-            sources.iter().find(|s| s["Id"] == source_id)
+            sources.iter().position(|s| s["Id"] == source_id)
         };
-        for source in sources {
-            self.remember(config, source, sources.len() == 1);
+        for source in sources.iter() {
+            self.remember(source, config.kind == MediaKind::Emby && sources.len() == 1);
         }
-        let Some(selected) = selected else {
+        let Some(index) = selected else {
             request.log(&self.logs, "warn", "No matching media source found", json!({"operation": "media_source", "reason": "no_matching_source", "sourceCount": sources.len()}));
             return None;
         };
+        let selected = std::mem::take(&mut sources[index]);
         // The TS clients cache the metadata before rejecting an unresolved STRM
         // on a cold lookup. Cached/PlaybackInfo paths must bypass this guard.
-        if string(selected, "Path").contains(".strm") {
-            request.log(&self.logs, "debug", "Unresolved STRM metadata cached for subsequent playback", json!({"operation": "media_source", "decision": "upstream_fallback", "reason": "cold_strm_metadata", "path": safe_path(string(selected, "Path"))}));
+        if string(&selected, "Path").contains(".strm") {
+            request.log(&self.logs, "debug", "Unresolved STRM metadata cached for subsequent playback", json!({"operation": "media_source", "decision": "upstream_fallback", "reason": "cold_strm_metadata", "path": safe_path(string(&selected, "Path"))}));
             return None;
         }
-        self.resolve_source(config, request, selected.clone(), sources.len() == 1)
-            .await
+        self.resolve_source(config, request, selected).await
+    }
+
+    fn remember_item_path(&self, id: &str, path: &str) {
+        if !id.is_empty() && !path.is_empty() {
+            self.cache
+                .lock()
+                .insert(id.to_owned(), Arc::from(path), Duration::from_secs(3600));
+        }
     }
 
     async fn resolve_source(
@@ -388,7 +417,6 @@ impl Media {
         config: &Config,
         request: &RequestInfo,
         mut selected: Value,
-        singleton: bool,
     ) -> Option<Value> {
         if string(&selected, "Path").is_empty() {
             request.log(
@@ -401,8 +429,8 @@ impl Media {
         }
         if config.kind == MediaKind::Jellyfin && string(&selected, "Path").ends_with(".strm") {
             if let Some(path) = self.strm_content(config, request, &selected).await {
+                self.remember_item_path(&query(&request.uri, "MediaSourceId"), &path);
                 selected["Path"] = path.into();
-                self.remember(config, &selected, singleton);
             } else {
                 // A failed STRM read did not abort the legacy pipeline: pathMap
                 // may still resolve the original STRM path through Openlist.
@@ -428,21 +456,18 @@ impl Media {
         );
         let result = async {
             let id = request.item_id();
+            let source_id = query(&request.uri, "MediaSourceId");
             let token = request.token(config.kind);
             let mut url = api_url(
                 config,
                 &format!(
                     "/Videos/{}/stream",
-                    if id.is_empty() {
-                        string(selected, "Id")
-                    } else {
-                        &id
-                    }
+                    if id.is_empty() { &source_id } else { &id }
                 ),
             )
             .ok_or("invalid_upstream_url")?;
             url.query_pairs_mut()
-                .append_pair("MediaSourceId", string(selected, "Id"))
+                .append_pair("MediaSourceId", &source_id)
                 .append_pair("Static", "true");
             let mut headers = request.api_headers();
             set_token(&mut headers, &token).ok_or("invalid_auth_header")?;

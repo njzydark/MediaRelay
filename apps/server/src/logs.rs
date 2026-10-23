@@ -30,7 +30,7 @@ pub struct LogEntry {
 #[derive(Default)]
 struct Inner {
     next: u64,
-    entries: VecDeque<LogEntry>,
+    entries: VecDeque<Arc<LogEntry>>,
 }
 
 #[derive(Clone, Default)]
@@ -59,20 +59,20 @@ impl Logs {
         inner.next += 1;
         let sequence = inner.next;
         let timestamp = now_ms();
-        inner.entries.push_back(LogEntry {
+        inner.entries.push_back(Arc::new(LogEntry {
             id: format!("{timestamp}-{sequence}"),
             timestamp,
             level: level.into(),
             message,
             details,
             sequence,
-        });
+        }));
         if inner.entries.len() > 1000 {
             inner.entries.pop_front();
         }
     }
 
-    pub fn list(&self, since: Option<u64>) -> Vec<LogEntry> {
+    pub fn list(&self, since: Option<u64>) -> Vec<Arc<LogEntry>> {
         self.inner
             .lock()
             .entries
@@ -82,7 +82,7 @@ impl Logs {
             .collect()
     }
 
-    pub fn after(&self, sequence: u64) -> Vec<LogEntry> {
+    pub fn after(&self, sequence: u64) -> Vec<Arc<LogEntry>> {
         self.inner
             .lock()
             .entries

@@ -1,9 +1,10 @@
-use std::time::Duration;
+use std::{error::Error as StdError, time::Duration};
 
 use axum::{body::Body, response::Response};
 use bytes::{Bytes, BytesMut};
 use futures_util::StreamExt;
 use http::{HeaderMap, HeaderValue, Request, Uri, response::Parts};
+use http_body_util::BodyExt;
 use hyper_rustls::HttpsConnector;
 use hyper_util::{
     client::legacy::{Client, connect::HttpConnector},
@@ -13,6 +14,8 @@ use hyper_util::{
 use crate::{
     config::Config,
     error::{Error, Result},
+    logs::Logs,
+    media::RequestInfo,
 };
 
 pub type ProxyClient = Client<HttpsConnector<HttpConnector>, Body>;
@@ -70,7 +73,10 @@ pub async fn forward(
     config: &Config,
     mut request: Request<Body>,
     rewrite: bool,
+    info: &RequestInfo,
+    logs: &Logs,
 ) -> Result<Response> {
+    let started = tokio::time::Instant::now();
     *request.uri_mut() = target_uri(config, request.uri())?;
     let host = request
         .uri()
@@ -90,13 +96,95 @@ pub async fn forward(
             .headers_mut()
             .insert("accept-encoding", HeaderValue::from_static("identity"));
     }
-    let response = tokio::time::timeout(Duration::from_secs(30), client.request(request))
-        .await
-        .map_err(|_| Error::Proxy)?
-        .map_err(|_| Error::Proxy)?;
+    let mut context = info.details(serde_json::json!({
+        "operation": "proxy", "upstreamOrigin": config.upstream.origin().ascii_serialization(),
+    }));
+    let response =
+        match tokio::time::timeout(Duration::from_secs(30), client.request(request)).await {
+            Ok(Ok(response)) => response,
+            result => {
+                let reason = match &result {
+                    Ok(Err(error)) => transport_error(error),
+                    _ => "timeout",
+                };
+                log_failure(logs, context, "response_headers", reason, started);
+                return Err(Error::Proxy);
+            }
+        };
     let (mut parts, body) = response.into_parts();
+    context["status"] = parts.status.as_u16().into();
     strip_hop_headers(&mut parts.headers);
+    let logs = logs.clone();
+    let body = body.map_err(move |error| {
+        log_failure(
+            &logs,
+            context.clone(),
+            "response_body",
+            transport_error(&error),
+            started,
+        );
+        error
+    });
     Ok(Response::from_parts(parts, Body::new(body)))
+}
+
+fn log_failure(
+    logs: &Logs,
+    mut context: serde_json::Value,
+    stage: &str,
+    reason: &str,
+    started: tokio::time::Instant,
+) {
+    context["stage"] = stage.into();
+    context["reason"] = reason.into();
+    context["durationMs"] = (started.elapsed().as_millis() as u64).into();
+    logs.detailed("warn", "Upstream proxy transport failed", context);
+}
+
+fn transport_error(error: &(dyn StdError + 'static)) -> &'static str {
+    let mut cause = Some(error);
+    let mut fallback = "transport_failed";
+    while let Some(error) = cause {
+        if error.is::<rustls::Error>() {
+            return "tls_failed";
+        }
+        if let Some(error) = error.downcast_ref::<hyper_util::client::legacy::Error>()
+            && error.is_connect()
+        {
+            fallback = "connection_failed";
+        }
+        if let Some(error) = error.downcast_ref::<hyper::Error>() {
+            if error.is_timeout() {
+                return "timeout";
+            }
+            if error.is_parse() {
+                fallback = "invalid_http_response";
+            } else if error.is_incomplete_message() || error.is_closed() {
+                fallback = "connection_closed";
+            }
+        }
+        if let Some(error) = error.downcast_ref::<std::io::Error>() {
+            match error.kind() {
+                std::io::ErrorKind::TimedOut => return "timeout",
+                std::io::ErrorKind::ConnectionRefused => return "connection_refused",
+                std::io::ErrorKind::ConnectionReset => return "connection_reset",
+                std::io::ErrorKind::ConnectionAborted => return "connection_aborted",
+                std::io::ErrorKind::BrokenPipe => return "broken_pipe",
+                std::io::ErrorKind::UnexpectedEof => fallback = "unexpected_eof",
+                _ => {}
+            }
+        }
+        // io::Error::source can skip the wrapped error itself (notably rustls).
+        cause = error
+            .downcast_ref::<std::io::Error>()
+            .and_then(|error| {
+                error
+                    .get_ref()
+                    .map(|inner| inner as &(dyn StdError + 'static))
+            })
+            .or_else(|| error.source());
+    }
+    fallback
 }
 
 pub enum Buffered {
@@ -225,4 +313,24 @@ pub async fn read_json_checked(
         .await
         .ok_or("unsupported_or_invalid_content_encoding")?;
     serde_json::from_slice(&decoded).map_err(|_| "invalid_json")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::transport_error;
+
+    #[test]
+    fn transport_error_classification_never_includes_untrusted_messages() {
+        for (kind, expected) in [
+            (std::io::ErrorKind::ConnectionRefused, "connection_refused"),
+            (std::io::ErrorKind::ConnectionReset, "connection_reset"),
+            (std::io::ErrorKind::TimedOut, "timeout"),
+        ] {
+            let error = std::io::Error::new(kind, "https://user:secret@host/path?token=secret");
+            assert_eq!(transport_error(&error), expected);
+        }
+        let error =
+            std::io::Error::other(rustls::Error::General("secret certificate detail".into()));
+        assert_eq!(transport_error(&error), "tls_failed");
+    }
 }

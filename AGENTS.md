@@ -27,12 +27,15 @@ MediaRelay proxies Emby/Jellyfin requests and redirects media playback to Openli
 - Failed rewrites return the original response; failed direct-link resolution falls back to the upstream proxy.
 - Keep configuration/API field names, units and frontend asset URLs compatible. Retain unknown configuration fields.
 - Compare complete request sequences against the TS baseline `fce33e1`, not just PlaybackInfo snapshots. In particular, cached Emby STRM paths still use pathMap/Openlist; failed Jellyfin STRM reads keep the original path for Openlist. Preserve legacy cold-cache fallback separately from the warm playback path.
+- Media caches retain paths only, and a cache hit exposes only `Path`, as in the TS clients. Preserve ItemId/source-ID lookup semantics and do not invalidate media paths for unrelated settings updates. Keep direct-link generation isolation independent of the media path cache. Full JSON passthrough does not require retaining full MediaSources in caches.
+- pathMap uses ordered, first-match JS string replacement, including `$$`, `$&`, `$'` and dollar-plus-backtick replacement tokens; do not replace it with literal-only Rust replacement.
 - Internal API requests follow bounded Fetch-style redirects, including POST-to-GET versus method/body preservation; ordinary proxy requests do not. Strip credentials on cross-origin redirects and never downgrade HTTPS.
 - Diagnostic log details must reach both tracing and the UI/SSE, include a request ID, stage, status and failure reason, and exclude credentials, remote media URL paths and response bodies. Successful log polling must not generate a recursive log feed.
 
 ## Rust Practices
 
 - Keep state bounded. Reuse HTTP clients, do not hold locks across network awaits, and make cancellation/configuration races explicit.
+- Do not add rewrite concurrency queues or explicit idle-connection count caps: preserve the legacy concurrency experience. Share immutable log records across polling/SSE snapshots; preserve wire format and all diagnostic levels. Classify proxy header/body transport failures without printing raw errors or URLs.
 - Use typed errors and graceful shutdown. No `unwrap`/`expect` in production request paths, and no unsafe code without a documented necessity.
 - Never log credentials, authentication query strings, signed direct links or response body previews.
 - Use Rust's standard formatter. Use Node's `node:test` describe/it and native assertions for TS tests; test core behavior with mocks, not live credentials.

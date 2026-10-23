@@ -290,11 +290,42 @@ pub fn transform_path(path: &str, map: &Value) -> String {
     if let Some(map) = map.as_object() {
         for (from, to) in map {
             if let Some(to) = to.as_str() {
-                result = result.replacen(&decode(from), &decode(to), 1);
+                result = replace_js_string(&result, &decode(from), &decode(to));
             }
         }
     }
     result
+}
+
+// String.replace with a string search interprets $$, $&, $` and $', but
+// leaves capture references literal because there are no regexp captures.
+fn replace_js_string(input: &str, from: &str, replacement: &str) -> String {
+    let Some(start) = input.find(from) else {
+        return input.to_owned();
+    };
+    let end = start + from.len();
+    let mut output = String::with_capacity(input.len() + replacement.len());
+    output.push_str(&input[..start]);
+    let mut chars = replacement.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '$' {
+            let substituted = match chars.peek() {
+                Some('$') => Some("$"),
+                Some('&') => Some(&input[start..end]),
+                Some('`') => Some(&input[..start]),
+                Some('\'') => Some(&input[end..]),
+                _ => None,
+            };
+            if let Some(value) = substituted {
+                output.push_str(value);
+                chars.next();
+                continue;
+            }
+        }
+        output.push(ch);
+    }
+    output.push_str(&input[end..]);
+    output
 }
 
 pub fn link_ttl(url: &str, max_age: u64, now: u64) -> u64 {
