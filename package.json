@@ -4,11 +4,14 @@
   "scripts": {
     "dev": "pnpm build && cargo run -p mediarelay",
     "dev:web": "pnpm --filter @mediarelay/web dev",
+    "dev:site": "pnpm --filter @mediarelay/site dev",
+    "build:site": "pnpm --filter @mediarelay/site build",
+    "preview:site": "pnpm --filter @mediarelay/site preview",
     "build": "pnpm --filter @mediarelay/web build && pnpm --filter @lib/emby build && pnpm --filter @lib/jellyfin build && node scripts/copy-static.mjs",
     "build:server": "cargo build --release --locked",
-    "check": "tsc --noEmit -p apps/web && tsc --noEmit -p packages/emby && tsc --noEmit -p packages/jellyfin && tsc --noEmit -p packages/shared",
-    "test": "node --test packages/shared/*.test.ts apps/web/src/*.test.ts",
-    "lint": "oxlint --deny-warnings apps/web packages scripts",
+    "check": "tsc --noEmit -p apps/web && tsc --noEmit -p apps/site && tsc --noEmit -p packages/emby && tsc --noEmit -p packages/jellyfin && tsc --noEmit -p packages/shared",
+    "test": "node --test packages/shared/*.test.ts apps/web/src/*.test.ts apps/site/src/*.test.ts",
+    "lint": "oxlint --deny-warnings apps/web apps/site packages scripts",
     "fmt": "oxfmt --write .",
     "fmt:check": "oxfmt --check ."
   },

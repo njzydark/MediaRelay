@@ -1,0 +1,24 @@
+{
+  "name": "@mediarelay/site",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "rsbuild dev",
+    "build": "rsbuild build && node scripts/verify-build.mjs",
+    "preview": "rsbuild preview",
+    "check": "tsc --noEmit -p .",
+    "lint": "oxlint --deny-warnings src scripts rsbuild.config.ts",
+    "test": "node --test src/*.test.ts"
+  },
+  "dependencies": {
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@rsbuild/core": "1.7.3",
+    "@rsbuild/plugin-react": "1.4.5",
+    "@types/react": "19.2.13",
+    "@types/react-dom": "19.2.3"
+  }
+}

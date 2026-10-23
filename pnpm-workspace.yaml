@@ -1,5 +1,6 @@
 packages:
   - apps/web
+  - apps/site
   - packages/*
 allowBuilds:
   "@swc/core": true

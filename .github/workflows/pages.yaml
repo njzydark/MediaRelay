@@ -1,0 +1,61 @@
+name: Website Pages
+
+on:
+  push:
+    branches: [feat/website]
+  pull_request:
+    paths:
+      - "apps/site/**"
+      - "assets/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.base.json"
+      - ".node-version"
+      - ".ox*"
+      - ".github/workflows/pages.yaml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-pages-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mediarelay/site check
+      - run: pnpm --filter @mediarelay/site lint
+      - run: pnpm exec oxfmt --check apps/site .github/workflows/pages.yaml
+      - run: pnpm --filter @mediarelay/site test
+      - run: pnpm build:site
+      - uses: actions/upload-pages-artifact@v4
+        if: github.event_name == 'push'
+        with:
+          path: apps/site/dist
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/website'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
