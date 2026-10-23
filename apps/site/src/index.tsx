@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { advanceElapsed, copyCommand, dockerCommand, scenarios, stageAt, stages } from "./model.ts";
-import type { Scenario, Service } from "./model.ts";
+import type { Service } from "./model.ts";
 import generalImage from "../../../assets/general.png";
 import storageImage from "../../../assets/storage.png";
 import playerImage from "../../../assets/external-player.png";
@@ -22,7 +22,7 @@ function Mark() {
   );
 }
 
-function usePlaybackClock(scenario: Scenario) {
+function usePlaybackClock() {
   const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -45,7 +45,6 @@ function usePlaybackClock(scenario: Scenario) {
     };
   }, []);
 
-  useEffect(() => setElapsed(0), [scenario]);
   const running = !paused && visible && !reduced && foreground;
   useEffect(() => {
     if (!running) return;
@@ -56,13 +55,13 @@ function usePlaybackClock(scenario: Scenario) {
       previous = now;
     }, 80);
     return () => window.clearInterval(timer);
-  }, [running, scenario]);
+  }, [running]);
 
   return { diagramRef, paused, setPaused, reduced, running, stage: reduced ? 2 : stageAt(elapsed) };
 }
 
-function FlowDiagram({ scenario }: { scenario: Scenario }) {
-  const { diagramRef, paused, setPaused, reduced, running, stage } = usePlaybackClock(scenario);
+function FlowDiagram() {
+  const { diagramRef, paused, setPaused, reduced, running, stage } = usePlaybackClock();
   return (
     <div
       ref={diagramRef}
@@ -74,10 +73,10 @@ function FlowDiagram({ scenario }: { scenario: Scenario }) {
           <i className="status-dot" />
           播放链路演示
         </span>
-        <span className="flow-kind">{scenarios[scenario].short}</span>
+        <span className="flow-kind">本地文件 / STRM 均支持</span>
       </div>
-      <DiagramDrawing scenario={scenario} mobile={false} />
-      <DiagramDrawing scenario={scenario} mobile />
+      <DiagramDrawing mobile={false} />
+      <DiagramDrawing mobile />
       <div className="flow-caption">
         <div>
           <span className="step-count">0{stage + 1} / 03</span>
@@ -108,27 +107,27 @@ function FlowDiagram({ scenario }: { scenario: Scenario }) {
   );
 }
 
-function DiagramDrawing({ scenario, mobile }: { scenario: Scenario; mobile: boolean }) {
+function DiagramDrawing({ mobile }: { mobile: boolean }) {
   const id = mobile ? "mobile" : "desktop";
   const nodes = mobile
-    ? { client: [24, 28], relay: [24, 176], media: [224, 176], openlist: [224, 324], cloud: [224, 472] }
-    : { client: [24, 142], relay: [245, 142], media: [476, 20], openlist: [476, 142], cloud: [476, 270] };
+    ? { client: [28, 32], relay: [28, 200], media: [232, 200], openlist: [232, 376], cloud: [232, 544] }
+    : { client: [36, 168], relay: [280, 168], media: [524, 32], openlist: [524, 168], cloud: [524, 326] };
   const paths = mobile
     ? {
-        request: "M95 110V176",
-        metadata: "M166 205H224",
-        resolve: "M166 230H195V351H224",
-        result: "M224 380H180V257H166",
-        redirect: "M55 176V110",
-        video: "M224 513H12V69H24",
+        request: "M110 114V200",
+        metadata: "M170 228H232",
+        resolve: "M170 252H206V404H232",
+        result: "M232 432H190V280H170",
+        redirect: "M68 200V114",
+        video: "M232 585H12V73H28",
       }
     : {
-        request: "M166 170H245",
-        metadata: "M320 142V61H476",
-        resolve: "M387 170H476",
-        result: "M476 200H387",
-        redirect: "M245 200H166",
-        video: "M476 311H95V224",
+        request: "M178 196H280",
+        metadata: "M351 168V73H524",
+        resolve: "M422 196H524",
+        result: "M524 226H422",
+        redirect: "M280 226H178",
+        video: "M524 367H107V250",
       };
   function node(key: keyof typeof nodes, title: string, caption: string, icon: string, extra = "") {
     const [x, y] = nodes[key];
@@ -150,11 +149,11 @@ function DiagramDrawing({ scenario, mobile }: { scenario: Scenario; mobile: bool
   return (
     <svg
       className={`diagram diagram-${id}`}
-      viewBox={mobile ? "0 0 390 580" : "0 0 650 378"}
+      viewBox={mobile ? "0 0 402 658" : "0 0 702 444"}
       role="img"
       aria-labelledby={`${id}-title ${id}-desc`}
     >
-      <title id={`${id}-title`}>{scenarios[scenario].title}：网盘直链播放流程</title>
+      <title id={`${id}-title`}>本地文件与 STRM 共用的网盘直链播放流程</title>
       <desc id={`${id}-desc`}>
         客户端经 MediaRelay 请求 Emby 或 Jellyfin 的播放信息，MediaRelay 通过 Openlist 取得直链并返回 302。视频从网盘或
         CDN 直接流向客户端，不经过 MediaRelay。
@@ -163,11 +162,27 @@ function DiagramDrawing({ scenario, mobile }: { scenario: Scenario; mobile: bool
         <pattern id={`${id}-grid`} width="22" height="22" patternUnits="userSpaceOnUse">
           <path d="M10 11h2" stroke="#c8d3e1" strokeWidth="1" />
         </pattern>
-        <marker id={`${id}-arrow`} markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-          <path d="m1 1 5 3-5 3" fill="none" stroke="#7b8ca6" strokeWidth="1.2" />
+        <marker
+          id={`${id}-arrow`}
+          markerUnits="userSpaceOnUse"
+          markerWidth="7"
+          markerHeight="7"
+          refX="6"
+          refY="3.5"
+          orient="auto"
+        >
+          <path d="m1 1 5 2.5-5 2.5" fill="none" stroke="#7b8ca6" strokeWidth="1.2" />
         </marker>
-        <marker id={`${id}-blue`} markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-          <path d="m1 1 5 3-5 3" fill="none" stroke="#245bd6" strokeWidth="1.4" />
+        <marker
+          id={`${id}-blue`}
+          markerUnits="userSpaceOnUse"
+          markerWidth="9"
+          markerHeight="9"
+          refX="8"
+          refY="4.5"
+          orient="auto"
+        >
+          <path d="m1 1 7 3.5-7 3.5" fill="none" stroke="#245bd6" strokeWidth="1.5" />
         </marker>
       </defs>
       <rect width="100%" height="100%" fill={`url(#${id}-grid)`} />
@@ -178,30 +193,30 @@ function DiagramDrawing({ scenario, mobile }: { scenario: Scenario; mobile: bool
         <path className="path-resolve" d={paths.result} />
         <path className="path-resolve" d={paths.redirect} />
       </g>
-      <path className="video-track" d={paths.video} fill="none" strokeWidth="3" markerEnd={`url(#${id}-blue)`} />
+      <path className="video-track" d={paths.video} fill="none" strokeWidth="2" markerEnd={`url(#${id}-blue)`} />
       <path
         className="video-particles"
         d={paths.video}
         fill="none"
-        strokeWidth="5"
+        strokeWidth="3"
         strokeDasharray="1 28"
         strokeLinecap="round"
       />
       <g className="diagram-labels">
-        <text x={mobile ? 104 : 185} y={mobile ? 148 : 157}>
+        <text x={mobile ? 119 : 208} y={mobile ? 159 : 183}>
           播放请求
         </text>
-        <text x={mobile ? 174 : 333} y={mobile ? 192 : 79}>
+        <text x={mobile ? 177 : 401} y={mobile ? 215 : 60}>
           播放信息
         </text>
-        <text x={mobile ? 235 : 402} y={mobile ? 309 : 157}>
+        <text x={mobile ? 245 : 453} y={mobile ? 356 : 183}>
           获取直链
         </text>
-        <text className="label-302" x={mobile ? 12 : 181} y={mobile ? 148 : 221}>
+        <text className="label-302" x={mobile ? 36 : 218} y={mobile ? 159 : 248}>
           302
         </text>
       </g>
-      <g className="video-label" transform={mobile ? "translate(111 432)" : "translate(176 265)"}>
+      <g className="video-label" transform={mobile ? "translate(55 482)" : "translate(205 310)"}>
         <text>视频流量 · 网盘直达客户端</text>
         <text y="20" className="video-label-sub">
           不经过 MediaRelay
@@ -209,8 +224,8 @@ function DiagramDrawing({ scenario, mobile }: { scenario: Scenario; mobile: bool
       </g>
       {node("client", "客户端", "你熟悉的播放方式", "▷")}
       {node("relay", "MediaRelay", "请求中继 / 直链解析", "↗", "node-highlight")}
-      {node("media", "Emby / Jellyfin", scenarios[scenario].source, "▤")}
-      {node("openlist", "Openlist", "映射路径 → 获取直链", "⌁")}
+      {node("media", "Emby / Jellyfin", "本地文件 / STRM 条目", "▤")}
+      {node("openlist", "Openlist", "根据文件路径获取直链", "⌁")}
       {node("cloud", "网盘 / CDN", "视频文件所在的位置", "☁")}
     </svg>
   );
@@ -428,7 +443,6 @@ const faqs = [
 ];
 
 function App() {
-  const [scenario, setScenario] = useState<Scenario>("local");
   return (
     <>
       <a className="skip-link" href="#main">
@@ -465,7 +479,7 @@ function App() {
               获取网盘直链，让视频直接到达客户端，保留熟悉的媒体库与播放器。
             </p>
             <p className="hero-condition">
-              本地有视频文件，或只有 STRM 等媒体条目，都可通过路径映射或解析关联 Openlist 中的文件。
+              支持本地文件与 STRM 媒体库。接入方式不同，最终都通过 Openlist 获取网盘直链。
             </p>
             <div className="hero-actions">
               <a className="key primary-key" href="#quick-start">
@@ -482,15 +496,7 @@ function App() {
             </div>
           </div>
           <div className="hero-demo">
-            <div className="scenario-switch" role="group" aria-label="切换媒体库场景">
-              {(["local", "strm"] as const).map((item) => (
-                <button key={item} type="button" aria-pressed={scenario === item} onClick={() => setScenario(item)}>
-                  <span className="choice-dot" />
-                  {scenarios[item].title}
-                </button>
-              ))}
-            </div>
-            <FlowDiagram scenario={scenario} />
+            <FlowDiagram />
             <p className="flow-fallback">直链解析失败时回退上游代理；能否继续播放取决于上游媒体是否可用。</p>
           </div>
         </section>
@@ -513,9 +519,9 @@ function App() {
               同一条直达路线。
             </h2>
             <p>
-              本地有没有视频实体文件，
+              区别在于如何关联文件，
               <br />
-              不是使用直链的分界线。
+              而不是播放时走哪条链路。
             </p>
           </div>
           <div className="scenario-stories">
@@ -534,9 +540,6 @@ function App() {
                   <Arrow />
                   <strong>网盘直链</strong>
                 </div>
-                <a className="text-link" href="#top" onClick={() => setScenario(item)}>
-                  查看这个场景的播放链路 <Arrow />
-                </a>
               </article>
             ))}
           </div>
