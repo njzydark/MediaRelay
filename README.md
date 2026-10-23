@@ -148,7 +148,7 @@ Docker 镜像保留 `/app/config` 挂载约定，仅包含 Rust 可执行文件�
 
 ## 官网开发与 GitHub Pages
 
-官网位于 `apps/site`，是独立的简体中文静态页面，包含本地文件 / STRM 共用的播放链路演示、两种接入方式说明、功能截图与快速开始。它不访问管理 API，也不包含在 Rust 服务的静态资源或 Docker 运行时中。
+官网位于 `apps/site`，是独立的简体中文静态页面，包含本地文件 / STRM 共用的播放链路演示、两种接入方式说明、功能截图、资源占用与快速开始。它不访问管理 API，也不包含在 Rust 服务的静态资源或 Docker 运行时中。资源占用的样本来源、统计口径与复测方法见 [RESOURCE_USAGE.md](./apps/site/RESOURCE_USAGE.md)，不是固定性能承诺。
 
 使用 `.node-version` 中的 Node.js 24.18.1 与 `package.json` 中的 pnpm 12.15.0，在仓库根目录执行：
 
