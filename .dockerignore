@@ -6,3 +6,8 @@
 **/coverage
 apps/server/config
 .vscode
+target
+.git
+.pnpm-store
+apps/server/config.json
+apps/server/static

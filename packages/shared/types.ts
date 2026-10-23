@@ -1,10 +1,5 @@
-// deno-lint-ignore-file ban-types
 export interface ExternalPlayer {
-  name:
-    | "vlc"
-    | "iina"
-    | "potplayer"
-    | (string & {});
+  name: "vlc" | "iina" | "potplayer" | (string & {});
   scheme: string;
   icon?: string;
   iconOnly?: boolean;
@@ -19,75 +14,6 @@ export interface ExternalPlayerConfig {
   ios?: ExternalPlayer[];
   linux?: ExternalPlayer[];
 }
-
-export abstract class StorageProvider {
-  abstract getDirectUrl: getDirectUrlFn;
-  abstract onServerConfigChange: ServerConfigChangeCallback;
-}
-
-export type getDirectUrlFn = (
-  mediaSourcePath: string,
-  options: { ua: string; ip?: string },
-) => string | null | Promise<string | null>;
-
-export abstract class MediaServer {
-  abstract baseUrl: string;
-  abstract type: string;
-  abstract onServerConfigChange: ServerConfigChangeCallback;
-  abstract getUserInfo: getUserInfoFn;
-  abstract identifyProxyAction: identifyProxyActionFn;
-  abstract getMediaSourcePath: getMediaSourcePathFn;
-  abstract rewriteHtml?: rewriteHtmlFn;
-  abstract redirectIndexHtml?: redirectIndexHtmlFn;
-  abstract rewritePlaybackInfo: rewritePlaybackInfoFn;
-  abstract rewriteStream: rewriteStreamFn;
-  abstract redirectDirectUrl: redirectDirectUrlFn;
-  abstract generateM3U?: generateM3U;
-}
-
-export interface MediaSourceInfo {
-  path?: string;
-  name?: string;
-  id?: string;
-  container?: "strm" | (string & {});
-}
-export type ShouldRewriteFn = (info: MediaSourceInfo) => boolean;
-
-export type identifyProxyActionFn = (
-  req: Request,
-) =>
-  | "direct"
-  | "redirectIndexHtml"
-  | "rewriteHtml"
-  | "rewritePlaybackInfo"
-  | "rewriteStream"
-  | "rewriteDownload"
-  | "redirectDirectUrl"
-  | "generateM3U";
-export type getUserInfoFn = (
-  req: Request,
-  extra: { userId: string; token?: string; apiKey?: string },
-) => Promise<{ isAdmin: boolean; name: string } | null>;
-export type getMediaSourcePathFn = (
-  req: Request,
-) => Promise<{ Name?: string; Id?: string; Path?: string; Container?: "strm" | (string & {}) } | null>;
-export type redirectIndexHtmlFn = (req: Request) => string | null;
-export type rewriteHtmlFn = (req: Request, originHtml: string) => Promise<string | null>;
-export type rewritePlaybackInfoFn = (
-  req: Request,
-  res: Response,
-  extra?: {
-    shouldRewrite?: ShouldRewriteFn;
-  },
-) => Promise<object | null>;
-export type rewriteStreamFn = (
-  req: Request,
-  extra?: {
-    shouldRewrite?: ShouldRewriteFn;
-  },
-) => Promise<string | null>;
-export type redirectDirectUrlFn = (req: Request) => Promise<string | null>;
-export type generateM3U = (req: Request) => Promise<string | null>;
 
 export interface Injection {
   type: "script" | "style";
@@ -163,8 +89,6 @@ export interface ServerConfig {
   filterRules?: FilterRule[];
 }
 
-export type ServerConfigChangeCallback = (config: ServerConfig) => void;
-
 export interface CacheEntry {
   ua: string;
   url: string;
@@ -189,12 +113,4 @@ export interface LogEntry {
   level: LogLevel;
   message: string;
   details?: string;
-}
-
-export interface Logger {
-  trace: (message: string, details?: string) => void;
-  debug: (message: string, details?: string) => void;
-  info: (message: string, details?: string) => void;
-  warn: (message: string, details?: string) => void;
-  error: (message: string, details?: string) => void;
 }

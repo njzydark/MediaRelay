@@ -1,6 +1,6 @@
 import styles from "./index.module.less";
 import { Tooltip as RawTooltip } from "@base-ui/react/tooltip";
-import type { ReactElement, ReactNode } from "react";
+import type { ReactElement } from "react";
 
 interface TooltipProps {
   children: ReactElement;
@@ -11,8 +11,7 @@ export const Tooltip = ({ children, content }: TooltipProps) => {
   return (
     <RawTooltip.Provider>
       <RawTooltip.Root>
-        <RawTooltip.Trigger render={children}>
-        </RawTooltip.Trigger>
+        <RawTooltip.Trigger render={children}></RawTooltip.Trigger>
         <RawTooltip.Portal>
           <RawTooltip.Positioner sideOffset={10} className={styles.Positioner}>
             <RawTooltip.Popup className={styles.Popup}>

@@ -10,9 +10,7 @@ export const defaultCommonPlayers: ExternalPlayerConfig["common"] = [
 ];
 
 export const defaultPlatformPlayers: Omit<ExternalPlayerConfig, "enabled"> = {
-  windows: [
-    { name: "PotPlayer", scheme: 'potplayer://$url /sub=$sub /seek=$start /title="$title"' },
-  ],
+  windows: [{ name: "PotPlayer", scheme: 'potplayer://$url /sub=$sub /seek=$start /title="$title"' }],
   macos: [
     {
       name: "IINA",
@@ -35,16 +33,19 @@ export function getExternalPlayers(config: ExternalPlayerConfig | undefined, _pl
   return [...commonPlayers, ...platformPlayers];
 }
 
-export function transformExternalPlayerScheme(scheme: string, options: {
-  videoUrl: string;
-  title?: string;
-  allSubtitles?: {
-    url: string;
-    title: string;
-    isDefault: boolean;
-  }[];
-  startSeconds?: string | number;
-}) {
+export function transformExternalPlayerScheme(
+  scheme: string,
+  options: {
+    videoUrl: string;
+    title?: string;
+    allSubtitles?: {
+      url: string;
+      title: string;
+      isDefault: boolean;
+    }[];
+    startSeconds?: string | number;
+  },
+) {
   const { videoUrl, title, startSeconds: _startSeconds, allSubtitles = [] } = options;
 
   const isPotPlayerScheme = scheme.startsWith("potplayer:");
@@ -60,28 +61,29 @@ export function transformExternalPlayerScheme(scheme: string, options: {
 
   if (scheme.startsWith("iina://")) {
     // iina 兼容多同名 key 参数后才能直接用 allSubtitles，目前先用第一个
-    const subParams = (allSubtitles.length ? [allSubtitles[0]] : []).map((sub, index) => {
-      return encodeURIComponent(JSON.stringify([sub.url, index === 0 ? "select" : "auto", sub.title]));
-    }).join(`&mpv_cmd_sub-add=`);
+    const subParams = (allSubtitles.length ? [allSubtitles[0]] : [])
+      .map((sub, index) => {
+        return encodeURIComponent(JSON.stringify([sub.url, index === 0 ? "select" : "auto", sub.title]));
+      })
+      .join(`&mpv_cmd_sub-add=`);
     subUrl = subParams ? `mpv_cmd_sub-add=${subParams}` : "";
-    console.log("subUrl", subUrl);
     startSeconds = `mpv_cmd_seek=${encodeURIComponent(JSON.stringify([String(startSeconds), "absolute"]))}`;
   }
 
   const vars: Record<string, string | number | undefined | null> = {
-    "$urlRaw": encodedUrl.raw,
-    "$urlEncodeURL": encodedUrl.encodeURL,
-    "$urlEncodeURIComponent": encodedUrl.encodeURIComponent,
-    "$url": encodedUrl[defaultUrlEncoding],
-    "$titleRaw": encodedTitle.raw,
-    "$titleEncodeURL": encodedTitle.encodeURL,
-    "$titleEncodeURIComponent": encodedTitle.encodeURIComponent,
-    "$title": titleValue,
-    "$subRaw": encodedSubtitle.raw,
-    "$subEncodeURL": encodedSubtitle.encodeURL,
-    "$subEncodeURIComponent": encodedSubtitle.encodeURIComponent,
-    "$sub": subUrl,
-    "$start": startSeconds,
+    $urlRaw: encodedUrl.raw,
+    $urlEncodeURL: encodedUrl.encodeURL,
+    $urlEncodeURIComponent: encodedUrl.encodeURIComponent,
+    $url: encodedUrl[defaultUrlEncoding],
+    $titleRaw: encodedTitle.raw,
+    $titleEncodeURL: encodedTitle.encodeURL,
+    $titleEncodeURIComponent: encodedTitle.encodeURIComponent,
+    $title: titleValue,
+    $subRaw: encodedSubtitle.raw,
+    $subEncodeURL: encodedSubtitle.encodeURL,
+    $subEncodeURIComponent: encodedSubtitle.encodeURIComponent,
+    $sub: subUrl,
+    $start: startSeconds,
   };
 
   let result = scheme;
@@ -102,7 +104,6 @@ export function transformExternalPlayerScheme(scheme: string, options: {
   }
 
   const final = result.replace(/\?$/, "").replace(/\?&/, "?");
-  console.log({ final });
   return final;
 }
 

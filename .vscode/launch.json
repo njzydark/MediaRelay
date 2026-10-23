@@ -2,17 +2,12 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "MediaRelay Rust",
+      "type": "lldb",
       "request": "launch",
-      "name": "app-server",
-      "type": "node",
-      "cwd": "${workspaceFolder}/apps/server",
-      "env": {},
-      "runtimeExecutable": "${userHome}/.deno/bin/deno",
-      "runtimeArgs": [
-        "task",
-        "dev:debug",
-      ],
-      "attachSimplePort": 9229
+      "cargo": { "args": ["build", "-p", "mediarelay"], "filter": { "name": "mediarelay", "kind": "bin" } },
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "build:web"
     }
   ]
 }

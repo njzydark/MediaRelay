@@ -1,6 +1,3 @@
 {
-  "recommendations": [
-    "denoland.vscode-deno",
-    "clinyong.vscode-css-modules"
-  ]
+  "recommendations": ["rust-lang.rust-analyzer", "vadimcn.vscode-lldb", "oxc.oxc-vscode", "clinyong.vscode-css-modules"]
 }

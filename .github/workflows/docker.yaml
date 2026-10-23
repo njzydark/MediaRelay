@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Image tag'
+        description: "Image tag"
         required: false
-        default: 'latest'
+        default: "rust"
 
 permissions:
   contents: read

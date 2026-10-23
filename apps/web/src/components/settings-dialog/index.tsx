@@ -156,7 +156,7 @@ export const SettingsDialog = ({ children, apiBaseUrl = "/mediarelay" }: Props) 
   };
 
   const updateOpenlist = (updates: Partial<ServerConfig["openlist"]>) => {
-    setConfig((prev) => prev ? { ...prev, openlist: { ...prev.openlist, ...updates } } : null);
+    setConfig((prev) => (prev ? { ...prev, openlist: { ...prev.openlist, ...updates } } : null));
   };
 
   const renderContent = () => {
@@ -175,18 +175,14 @@ export const SettingsDialog = ({ children, apiBaseUrl = "/mediarelay" }: Props) 
               onCheckedChange={(v) => updateConfig({ webDirect: v })}
               disabled={isLoading}
             />
-            <div className={styles.HelpText}>
-              {t("settings.webDirect.help")}
-            </div>
+            <div className={styles.HelpText}>{t("settings.webDirect.help")}</div>
             <Switch
               label={t("settings.webDirectLocalFallback.label")}
               checked={config.webDirectLocalFallback ?? false}
               onCheckedChange={(v) => updateConfig({ webDirectLocalFallback: v })}
               disabled={isLoading}
             />
-            <div className={styles.HelpText}>
-              {t("settings.webDirectLocalFallback.help")}
-            </div>
+            <div className={styles.HelpText}>{t("settings.webDirectLocalFallback.help")}</div>
 
             <div className={styles.SubSection}>
               <h4 className={styles.SubSectionTitle}>{t("cache.title")}</h4>
@@ -250,9 +246,7 @@ export const SettingsDialog = ({ children, apiBaseUrl = "/mediarelay" }: Props) 
         return (
           <div className={styles.Section}>
             <h3 className={styles.SectionTitle}>{t("injections.title")}</h3>
-            <div className={styles.HelpText}>
-              {t("injections.description")}
-            </div>
+            <div className={styles.HelpText}>{t("injections.description")}</div>
             <InjectionsEditor
               value={config.injections || []}
               onChange={(v) => updateConfig({ injections: v })}
@@ -305,9 +299,7 @@ export const SettingsDialog = ({ children, apiBaseUrl = "/mediarelay" }: Props) 
       }
       content={
         <div className={styles.Container}>
-          <div className={styles.Content}>
-            {renderContent()}
-          </div>
+          <div className={styles.Content}>{renderContent()}</div>
           {error && <div className={styles.Error}>{error}</div>}
           {success && <div className={styles.Success}>{t("common.success")}</div>}
         </div>
@@ -322,20 +314,10 @@ export const SettingsDialog = ({ children, apiBaseUrl = "/mediarelay" }: Props) 
             </LogsDialog>
           </div>
           <div className={styles.FooterRight}>
-            <button
-              className={styles.RefreshButton}
-              onClick={fetchConfig}
-              disabled={isLoading}
-              type="button"
-            >
+            <button className={styles.RefreshButton} onClick={fetchConfig} disabled={isLoading} type="button">
               {t("common.reset")}
             </button>
-            <button
-              className={styles.SaveButton}
-              onClick={saveConfig}
-              disabled={isLoading || !config}
-              type="button"
-            >
+            <button className={styles.SaveButton} onClick={saveConfig} disabled={isLoading || !config} type="button">
               {isLoading ? t("common.loading") : t("common.confirm")}
             </button>
           </div>

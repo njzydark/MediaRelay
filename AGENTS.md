@@ -1,117 +1,58 @@
-# AGENTS.md
+# MediaRelay Development
 
-## Project Context & Principles
+## Purpose
 
-**Goal**:
+MediaRelay proxies Emby/Jellyfin requests and redirects media playback to Openlist direct links. Preserve existing client behavior and the `/mediarelay` UI/API namespace.
 
-To improve Emby/Jellyfin playback performance by redirecting media requests to high-speed direct links (via Openlist/115 Drive), bypassing the low-bandwidth Emby server
+## Stack
 
-**Core Workflow (The "Why"):**
+- Backend: Rust 2024, Tokio, Axum, Hyper for streaming HTTP proxying, Reqwest for bounded API calls.
+- Frontend: Node.js 24 LTS, pnpm workspace, TypeScript, React 19, BaseUI, Rsbuild and Rslib.
+- Frontend lint/format: Oxc (`oxlint` / `oxfmt`), not ESLint or Prettier.
+- Rust is the only server runtime. Node.js is needed only for frontend development/builds. Do not reintroduce Deno.
+- Use the tool versions in `rust-toolchain.toml`, `.node-version` and `package.json`; commit both lockfiles.
 
-1.  **Intercept**: The HonoJS server acts as a middleware/proxy for the Emby Client/Emby Web
-2.  **Rewrite**: When a specific API request (e.g., `/Items/{Id}/PlaybackInfo`) is detected:
-    - Extract the media hash/id
-    - Resolve the direct download link using `/packages/openlist`
-    - Replace the original media source URL in the JSON response
-3.  **Proxy**: All other non-media requests (images, metadata) are transparently proxied to the upstream Emby server
+## Layout
 
-**Key Concepts**:
+- `apps/server`: Rust backend, integration tests and generated static resources.
+- `apps/web`: React administration UI.
+- `packages/emby`, `packages/jellyfin`: browser injection scripts and browser API types.
+- `packages/shared`: browser-side types and utilities.
 
-- **Upstream**: The original Emby Server
-- **Direct Link**: The short-lived, high-speed URL from the cloud storage
-- **Rewriter**: The logic that patches the JSON response body
+## Compatibility Rules
 
-## Tech Stack & Frameworks
+- Rewrite upstream JSON using the complete `serde_json::Value`, with `arbitrary_precision` enabled. Only change the explicitly intended fields; never reconstruct responses from partial DTOs.
+- Preserve unknown fields recursively, numeric precision, missing values and nulls. Remove fields where the original JS used `undefined`; do not insert null instead.
+- Stream ordinary request/response bodies. Never buffer media downloads. Preserve encoded paths, duplicate query parameters, status codes, Range responses and repeated response headers.
+- Failed rewrites return the original response; failed direct-link resolution falls back to the upstream proxy.
+- Keep configuration/API field names, units and frontend asset URLs compatible. Retain unknown configuration fields.
+- Compare complete request sequences against the TS baseline `fce33e1`, not just PlaybackInfo snapshots. In particular, cached Emby STRM paths still use pathMap/Openlist; failed Jellyfin STRM reads keep the original path for Openlist. Preserve legacy cold-cache fallback separately from the warm playback path.
+- Media caches retain paths only, and a cache hit exposes only `Path`, as in the TS clients. Preserve ItemId/source-ID lookup semantics and do not invalidate media paths for unrelated settings updates. Keep direct-link generation isolation independent of the media path cache. Full JSON passthrough does not require retaining full MediaSources in caches.
+- pathMap uses ordered, first-match JS string replacement, including `$$`, `$&`, `$'` and dollar-plus-backtick replacement tokens; do not replace it with literal-only Rust replacement.
+- Internal API requests follow bounded Fetch-style redirects, including POST-to-GET versus method/body preservation; ordinary proxy requests do not. Strip credentials on cross-origin redirects and never downgrade HTTPS.
+- Diagnostic log details must reach both tracing and the UI/SSE, include a request ID, stage, status and failure reason, and exclude credentials, remote media URL paths and response bodies. Successful log polling must not generate a recursive log feed.
 
-### Core
-- **Runtime**: Deno 2.x (Use `deno` for all commands)
-- **Package Management**: Deno Workspaces (No `package.json`, use `deno.json` imports)
-- **Build Tool (App)**: Rsbuild (Rspack based)
-- **Build Tool (Lib)**: Rslib (Rspack based)
+## Rust Practices
 
-### Backend (API)
-- **Framework**: HonoJS (Deno adapter)
-- **Logic**: Pure TypeScript
+- Keep state bounded. Reuse HTTP clients, do not hold locks across network awaits, and make cancellation/configuration races explicit.
+- Do not add rewrite concurrency queues or explicit idle-connection count caps: preserve the legacy concurrency experience. Share immutable log records across polling/SSE snapshots; preserve wire format and all diagnostic levels. Classify proxy header/body transport failures without printing raw errors or URLs.
+- Use typed errors and graceful shutdown. No `unwrap`/`expect` in production request paths, and no unsafe code without a documented necessity.
+- Never log credentials, authentication query strings, signed direct links or response body previews.
+- Use Rust's standard formatter. Use Node's `node:test` describe/it and native assertions for TS tests; test core behavior with mocks, not live credentials.
 
-### Frontend (Web UI)
-- **Framework**: react 19
-- **UI**: [BaseUI](https://base-ui.com/llms.txt)
+## Verification
 
-## Project Structure
-
-- `/apps/web`: react 19 Frontend application (built with Rsbuild)
-- `/apps/server`: HonoJS Backend server
-- `/packages/shared`: shared types/logic
-- `/packages/openlist`: openlist logic for get direct url
-- `/packages/emby`: emby login for rewrite emby response (built with Rslib)
-- `/deno.json`: Root configuration
-
-## Critical Development Rules (MUST FOLLOW)
-
-### Deno & TypeScript
-
-- Use Web Standard APIs (Request, Response, fetch)
-
-### Verification Standards (The "Definition of Done")
-
-Before finalizing any code change, ensure it passes strict Deno standards:
-
-- **Format**: Code must match `deno fmt` rules
-- **Lint**: No `deno lint` errors
-- **Types**: Must pass `deno check`. **DO NOT** use `@ts-ignore` unless absolutely necessary and documented
-
-## Code style
-
-```json
-"useTabs": false,
-"lineWidth": 120,
-"indentWidth": 2,
-"semiColons": true,
-"singleQuote": false,
-"proseWrap": "preserve",
+```sh
+cargo fmt --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+cargo build --release --locked
+pnpm install --frozen-lockfile
+pnpm check
+pnpm lint
+pnpm fmt:check
+pnpm test
+pnpm build
 ```
 
-## Common commands
-
-```bash
-# test
-deno test
-# lint
-deno lint
-# types check
-deno check
-# format code
-deno fmt
-# server dev watch mode
-deno task dev
-# compile server
-deno task compile
-```
-
-## Unit Test Guidelines
-
-Follow BDD (Behavior Driven Development) style using Deno Standard Library. Do not use Jest or Vitest syntax
-
-```ts
-import { describe, it } from "@std/testing/bdd";
-import { expect } from "@std/expect";
-import { FakeTime } from "@std/testing/time";
-import { calculateMaxAgeMs, getCommonDataFromRequest, isWebBrowser, playbackPositionTicksToSeconds } from "./utils.ts";
-
-describe("playbackPositionTicksToSeconds", () => {
-  it("basic", () => {
-    expect(playbackPositionTicksToSeconds(10_000_000)).toBe("1");
-    expect(playbackPositionTicksToSeconds(0)).toBe("0");
-    expect(playbackPositionTicksToSeconds(1_359_000)).toBe("0.135");
-    expect(playbackPositionTicksToSeconds(1_354_000)).toBe("0.135");
-  });
-
-  it("custom fraction digits", () => {
-    // 0.0019 seconds = 19,000 ticks
-    const ticks = 19000;
-    expect(playbackPositionTicksToSeconds(ticks)).toBe("0.001");
-    expect(playbackPositionTicksToSeconds(ticks, { fractionDigits: 2 })).toBe("0");
-    expect(playbackPositionTicksToSeconds(ticks, { fractionDigits: 4 })).toBe("0.0019");
-  });
-});
-```
+Run `pnpm build && cargo run -p mediarelay` from the repository root. Preserve local configuration and never commit credentials. Do not publish images or push branches unless requested.

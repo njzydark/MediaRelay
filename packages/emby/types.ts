@@ -1,4 +1,3 @@
-// deno-lint-ignore-file ban-types
 export type MediaStreams = {
   Codec: "h264" | "eac3" | "subrip" | "ass" | (string & {});
   Type: "Video" | "Audio" | "Subtitle" | (string & {});

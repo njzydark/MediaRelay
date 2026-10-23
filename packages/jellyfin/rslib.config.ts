@@ -3,7 +3,7 @@ import { defineConfig } from "@rslib/core";
 export default defineConfig({
   source: {
     entry: {
-      "cors": "./scripts/cors.ts",
+      cors: "./scripts/cors.ts",
       "external-player": "./scripts/external-player.ts",
     },
   },
