@@ -2,6 +2,7 @@ import { StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { advanceElapsed, copyCommand, dockerCommand, scenarios, stageAt, stages } from "./model.ts";
 import type { Service } from "./model.ts";
+import { resourceMetrics, resourceSamples } from "./resources.ts";
 import generalImage from "../../../assets/general.png";
 import storageImage from "../../../assets/storage.png";
 import playerImage from "../../../assets/external-player.png";
@@ -65,14 +66,11 @@ function FlowDiagram() {
   return (
     <div
       ref={diagramRef}
-      className={`flow-panel ${running ? "is-running" : "is-paused"} ${reduced ? "is-static" : ""}`}
+      className={`playback-flow ${running ? "is-running" : "is-paused"} ${reduced ? "is-static" : ""}`}
       data-stage={stage}
     >
       <div className="flow-topline">
-        <span>
-          <i className="status-dot" />
-          播放链路演示
-        </span>
+        <span>播放链路演示</span>
         <span className="flow-kind">本地文件 / STRM 均支持</span>
       </div>
       <DiagramDrawing mobile={false} />
@@ -324,6 +322,72 @@ function ProductTour() {
   );
 }
 
+function ResourceUsage() {
+  return (
+    <section className="resources-section section-shell" id="resources" aria-labelledby="resources-title">
+      <div className="section-heading">
+        <div>
+          <span className="section-number">资源占用 / 实测参考</span>
+          <h2 id="resources-title">
+            轻装运行。
+            <br />
+            占用看得见。
+          </h2>
+        </div>
+        <p>
+          运行时仅需 Rust 服务与静态资源。
+          <br />
+          无需 Node.js，以下为实际采样参考。
+        </p>
+      </div>
+      <dl className="resource-metrics">
+        {resourceMetrics.map((metric, index) => (
+          <div key={metric.id}>
+            <dt>
+              <span className="resource-index">0{index + 1}</span>
+              {metric.label}
+            </dt>
+            <dd className="resource-reading">
+              <span className="resource-approx">约</span>
+              <strong>{metric.value}</strong>
+              <span className="resource-unit">MB</span>
+            </dd>
+            <dd className="resource-source">{metric.source}</dd>
+            <dd className="resource-detail">{metric.detail}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="resource-notes">
+        <p>
+          {resourceSamples.date} 记录 · 仅为 MediaRelay 本身的样本，不含 Emby / Jellyfin 与 Openlist。
+          实际占用随架构、缓存、日志与并发变化，不是固定值或内存上限。
+        </p>
+        <details className="resource-methods">
+          <summary>采样条件与统计口径</summary>
+          <div>
+            <p>
+              <strong>镜像：</strong>读取 {resourceSamples.image.reference} 的仓库清单，合计压缩层与配置大小。
+              linux/amd64 约 13.9 MB，linux/arm64 约 13.5 MB；已有镜像层缓存时，实际下载量更少。
+            </p>
+            <p>
+              <strong>空闲：</strong>全新配置、网络隔离、无客户端请求与上游连接。启动约 3 分钟后，三次 Docker stats
+              读数均为 2.578 MiB，换算约 2.7 MB；这是容器内存统计，不是进程 RSS。
+            </p>
+            <p>
+              <strong>使用中：</strong>用户提供的运行监控截图，{resourceSamples.normal.observedAt} 读数为 19.453 MB。
+              未记录架构、并发与具体负载，不据此推断峰值或并发容量。
+            </p>
+            <p>
+              本地测试与用户样本的环境、统计来源不同，不构成严格的空闲 / 负载对照测试。MB
+              按十进制换算，用户截图沿用原始单位。
+            </p>
+          </div>
+        </details>
+      </div>
+    </section>
+  );
+}
+
 function QuickStart() {
   const [service, setService] = useState<Service>("emby");
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
@@ -456,6 +520,7 @@ function App() {
         <nav aria-label="主导航">
           <a href="#scenarios">使用场景</a>
           <a href="#features">功能</a>
+          <a href="#resources">资源占用</a>
           <a href="#quick-start">快速开始</a>
         </nav>
         <a className="header-github" href={repository}>
@@ -548,6 +613,7 @@ function App() {
           </p>
         </section>
         <ProductTour />
+        <ResourceUsage />
         <QuickStart />
         <section className="faq-section section-shell" id="faq" aria-labelledby="faq-title">
           <div>
