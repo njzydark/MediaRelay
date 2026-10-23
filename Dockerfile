@@ -3,6 +3,7 @@ WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/web/package.json ./apps/web/package.json
+COPY apps/site/package.json ./apps/site/package.json
 COPY packages/emby/package.json ./packages/emby/package.json
 COPY packages/jellyfin/package.json ./packages/jellyfin/package.json
 COPY packages/shared/package.json ./packages/shared/package.json

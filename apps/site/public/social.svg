@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#f8fafc"/>
+  <path d="M80 500h1040M80 120h1040" stroke="#cbd5e1"/>
+  <text x="80" y="235" font-family="sans-serif" font-size="92" font-weight="600" fill="#172133">MediaRelay</text>
+  <text x="85" y="335" font-family="sans-serif" font-size="40" fill="#354259">让公网观影更流畅。</text>
+  <path d="M85 425h930m-35-25 35 25-35 25" fill="none" stroke="#245bd6" stroke-width="8"/>
+  <text x="85" y="555" font-family="sans-serif" font-size="25" fill="#354259">Emby / Jellyfin · Openlist · Rust · MIT</text>
+</svg>
