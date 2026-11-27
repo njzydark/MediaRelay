@@ -2,7 +2,17 @@ name: Website Pages
 
 on:
   push:
-    branches: [feat/website]
+    branches: [main]
+    paths:
+      - "apps/site/**"
+      - "assets/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.base.json"
+      - ".node-version"
+      - ".ox*"
+      - ".github/workflows/pages.yaml"
   pull_request:
     paths:
       - "apps/site/**"
@@ -14,6 +24,7 @@ on:
       - ".node-version"
       - ".ox*"
       - ".github/workflows/pages.yaml"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -39,12 +50,12 @@ jobs:
       - run: pnpm --filter @mediarelay/site test
       - run: pnpm build:site
       - uses: actions/upload-pages-artifact@v4
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         with:
           path: apps/site/dist
 
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/website'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-latest
     permissions:

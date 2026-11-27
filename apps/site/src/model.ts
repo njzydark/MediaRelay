@@ -40,7 +40,7 @@ export function dockerCommand(service: Service): string {
     `  -e ${variable}=http://YOUR_MEDIA_SERVER:8096 \\`,
     "  -v ./config:/app/config \\",
     "  -p 3000:3000 \\",
-    "  ghcr.io/njzydark/mediarelay:rust",
+    "  ghcr.io/njzydark/mediarelay:latest",
   ].join("\n");
 }
 

@@ -11,23 +11,23 @@ describe("resource usage samples", () => {
 
   it("uses registry compressed layers and config, separately for each architecture", () => {
     const { amd64, arm64 } = resourceSamples.image;
-    assert.equal(amd64.compressedLayerBytes + amd64.configBytes, 13_852_856);
-    assert.equal(arm64.compressedLayerBytes + arm64.configBytes, 13_477_982);
+    assert.equal(amd64.compressedLayerBytes + amd64.configBytes, 13_886_430);
+    assert.equal(arm64.compressedLayerBytes + arm64.configBytes, 13_530_784);
     assert.equal(resourceMetrics[0].value, "13.9");
     assert.match(resourceMetrics[0].detail, /linux\/arm64 约 13.5 MB/);
   });
 
-  it("preserves the user sample's original MB unit and rounded reading", () => {
-    assert.equal(resourceSamples.normal.megabytes, 19.453);
-    assert.equal(resourceMetrics.find((metric) => metric.id === "normal")?.value, "19.5");
+  it("formats the k3s working-set sample in decimal MB", () => {
+    assert.equal(resourceSamples.normal.workingSetBytes, 5_566_464);
+    assert.equal(resourceMetrics.find((metric) => metric.id === "normal")?.value, "5.6");
   });
 
   it("distinguishes the sources and scope of the three measurements", () => {
     assert.equal(resourceMetrics.length, 3);
-    assert.match(resourceMetrics[0].source, /GHCR.*linux\/amd64/);
+    assert.match(resourceMetrics[0].source, /GHCR latest.*linux\/amd64/);
     assert.match(resourceMetrics[0].detail, /完整拉取的压缩大小/);
     assert.match(resourceMetrics[1].source, /linux\/arm64.*隔离容器/);
-    assert.match(resourceMetrics[2].source, /用户提供/);
+    assert.match(resourceMetrics[2].source, /k3s 实测样本/);
     assert.match(resourceMetrics[2].detail, /不代表峰值或内存上限/);
   });
 });

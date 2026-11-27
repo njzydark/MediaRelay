@@ -52,7 +52,7 @@ describe("Docker quick start", () => {
     assert.equal(emby.replace("EMBY_URL", "JELLYFIN_URL"), jellyfin);
     assert.match(emby, /-v \.\/config:\/app\/config/);
     assert.match(emby, /-p 3000:3000/);
-    assert.match(emby, /ghcr\.io\/njzydark\/mediarelay:rust$/);
+    assert.match(emby, /ghcr\.io\/njzydark\/mediarelay:latest$/);
     assert.equal(emby.split("\n").length, 5);
     assert.ok(
       emby

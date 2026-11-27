@@ -9,7 +9,7 @@ import playerImage from "../../../assets/external-player.png";
 import "./style.css";
 
 const repository = "https://github.com/njzydark/MediaRelay";
-const readme = `${repository}/tree/rust#readme`;
+const readme = `${repository}#readme`;
 
 type StageIndex = 0 | 1 | 2;
 type NodeKey = "client" | "relay" | "media" | "openlist" | "cloud";
@@ -672,12 +672,13 @@ function ResourceUsage() {
               读数均为 2.578 MiB，换算约 2.7 MB；这是容器内存统计，不是进程 RSS。
             </p>
             <p>
-              <strong>使用中：</strong>用户提供的运行监控截图，{resourceSamples.normal.observedAt} 读数为 19.453 MB。
-              未记录架构、并发与具体负载，不据此推断峰值或并发容量。
+              <strong>使用中：</strong>linux/amd64 k3s 集群实测样本，{resourceSamples.normal.observedAt} 处理 1,800+
+              请求及多次 302 跳转后，cAdvisor WorkingSet 读数为 5.31 MiB（换算约 5.6 MB，同期峰值约 9.47
+              MiB）。不据此推断并发容量或内存上限。
             </p>
             <p>
-              本地测试与用户样本的环境、统计来源不同，不构成严格的空闲 / 负载对照测试。MB
-              按十进制换算，用户截图沿用原始单位。
+              本地空闲测试与集群运行样本的环境、统计来源不同，不构成严格的空闲 / 负载对照测试。页面展示统一按十进制 MB
+              换算。
             </p>
           </div>
         </details>
@@ -702,7 +703,7 @@ function DockerCommandCode({ service }: { service: Service }) {
       <span className="tok-flag">-p</span> <span className="tok-val">3000:3000</span>{" "}
       <span className="tok-slash">\</span>
       {"\n  "}
-      <span className="tok-img">ghcr.io/njzydark/mediarelay:rust</span>
+      <span className="tok-img">ghcr.io/njzydark/mediarelay:latest</span>
     </code>
   );
 }
@@ -728,12 +729,9 @@ function QuickStart() {
             走一条直接的路。
           </h2>
           <p>准备好 Emby 或 Jellyfin，以及已挂载对应网盘的 Openlist。MediaRelay 负责把它们连接起来。</p>
-          <a className="text-link" href={`${repository}/tree/rust#快速开始`}>
+          <a className="text-link" href={`${repository}#快速开始`}>
             完整部署说明 <Arrow diagonal />
           </a>
-          <p className="release-note">
-            示例使用 <code>rust</code> 镜像标签。维护者发布前，请按 README 本地构建镜像。
-          </p>
         </div>
         <div className="start-content">
           <div className="command-panel">
@@ -1014,7 +1012,7 @@ function App() {
                 Telegram <Arrow diagonal />
               </a>
             </nav>
-            <a href={`${repository}/blob/rust/LICENSE`}>MIT License</a>
+            <a href={`${repository}/blob/main/LICENSE`}>MIT License</a>
           </div>
         </div>
       </footer>

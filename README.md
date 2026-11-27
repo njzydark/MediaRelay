@@ -1,7 +1,5 @@
 # MediaRelay
 
-> 本分支为 Rust 版本：Rust 是唯一后端，前端构建使用 Node.js + pnpm，不再依赖 Deno。迁移保留现有 Emby/Jellyfin UI、管理 API 和配置格式。
-
 一款旨在改善 Emby/Jellyfin 公网观看体验的请求中继/代理工具。通过 Openlist 将可直链播放的视频流请求 302 重定向到网盘直链，减少视频中转对媒体服务器上行带宽的依赖。支持本地视频有对应网盘副本和 STRM 媒体库两种场景；实际观看效果仍取决于网盘、客户端网络、视频码率及配置。
 
 > [!IMPORTANT]
@@ -31,9 +29,9 @@
 
 ```bash
 # emby
-docker run -d --name mediarelay -e EMBY_URL=http://xxx:8096 -v ./config:/app/config -p 3000:3000 ghcr.io/njzydark/mediarelay:rust
+docker run -d --name mediarelay -e EMBY_URL=http://xxx:8096 -v ./config:/app/config -p 3000:3000 ghcr.io/njzydark/mediarelay:latest
 # jellyfin
-docker run -d --name mediarelay -e JELLYFIN_URL=http://xxx:8096 -v ./config:/app/config -p 3000:3000 ghcr.io/njzydark/mediarelay:rust
+docker run -d --name mediarelay -e JELLYFIN_URL=http://xxx:8096 -v ./config:/app/config -p 3000:3000 ghcr.io/njzydark/mediarelay:latest
 ```
 
 访问 3000 端口，点击顶部头像即可看到 mediarelay 功能设置入口
@@ -138,13 +136,13 @@ pnpm test
 pnpm build
 
 # 本地构建镜像，不会发布
-docker build -t mediarelay:rust .
-docker run --rm -e EMBY_URL=http://host.docker.internal:8096 -p 3000:3000 mediarelay:rust
+docker build -t mediarelay:latest .
+docker run --rm -e EMBY_URL=http://host.docker.internal:8096 -p 3000:3000 mediarelay:latest
 ```
 
 `apps/server/tests/fixtures/playback.json` 来自迁移基线 `fce33e1` 的原始 TS 改写逻辑，覆盖 Emby/Jellyfin、浏览器开关、音轨回退和过滤跳过。`apps/server/tests/legacy_parity.rs` 补充完整请求序列：PlaybackInfo → 路径缓存 → STRM → pathMap → Openlist，并覆盖冷缓存、读取失败、压缩、内部 API 重定向、鉴权头透传及诊断日志。`apps/server/tests/review_regressions.rs` 覆盖保存设置后的 STRM 播放、路径缓存字段形态与过滤结果、JS 替换值、日志共享、无额外排队的并发重写及代理传输错误。其他测试覆盖字段透传、代理及并发行为，均使用本地模拟服务，不需要网盘凭据。真实媒体服务和网盘的播放验收仍需使用自己的环境。
 
-Docker 镜像保留 `/app/config` 挂载约定，仅包含 Rust 可执行文件与静态资源，不需要 Node.js/Deno。此分支的镜像工作流默认标签为 `rust`；在维护者发布之前，请先本地构建，已有 `latest` 不受影响。
+Docker 镜像保留 `/app/config` 挂载约定，仅包含 Rust 可执行文件与静态资源，不需要 Node.js/Deno。镜像工作流默认标签为 `latest`。
 
 ## 官网开发与 GitHub Pages
 
@@ -164,11 +162,11 @@ pnpm preview:site   # 预览生产构建
 ### 首次发布
 
 1. 在仓库 **Settings → Pages → Build and deployment** 中，将 **Source** 选择为 **GitHub Actions**。
-2. 检查 **Settings → Environments → github-pages**，允许 `feat/website` 分支部署。如果采用 Selected branches and tags，添加该分支规则；只允许默认分支会阻止官网发布。
-3. 将官网分支推送到远程：`git push -u origin feat/website`。本地构建不会自动推送或发布。
+2. 检查 **Settings → Environments → github-pages**，允许 `main` 分支部署。如果采用 Selected branches and tags，添加该分支规则。
+3. 将官网改动合入 `main` 分支，或在 **Actions → Website Pages** 中手动触发工作流。本地构建不会自动推送或发布。
 4. 查看 **Actions → Website Pages**。工作流先检查、测试和构建，再部署 `apps/site/dist`；成功后默认访问 <https://njzydark.github.io/MediaRelay/>。
 
-后续向 `feat/website` 推送会重新发布；相关 PR 只检查和构建，不部署。工作流不依赖默认分支上的手动触发入口，不需要额外部署 token。若要更换发布分支，需要同时修改工作流触发条件、部署条件和 environment 的分支规则。
+后续向 `main` 推送官网相关改动会自动重新发布；相关 PR 只检查和构建，不部署。工作流不需要额外部署 token。若要更换发布分支，需要同时修改工作流触发条件、部署条件和 environment 的分支规则。
 
 官网使用相对静态资源地址与页内锚点，支持根路径和 `/MediaRelay/` 项目路径，不需要 SPA 路由回退。首版未配置自定义域名；若将来更换部署地址，还需同步调整页面分享元信息。字体在本地托管，OFL 许可证随产物保留在 `licenses/` 中；界面截图复用仓库公开素材，不读取本地配置或真实凭据。
 
