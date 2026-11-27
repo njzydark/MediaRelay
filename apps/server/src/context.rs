@@ -93,7 +93,16 @@ pub fn string<'a>(value: &'a Value, key: &str) -> &'a str {
 }
 
 pub fn auth_token(headers: &HeaderMap) -> String {
-    let auth = header(headers, "authorization");
+    for name in ["authorization", "x-emby-authorization"] {
+        let token = auth_token_from(header(headers, name));
+        if !token.is_empty() {
+            return token;
+        }
+    }
+    String::new()
+}
+
+fn auth_token_from(auth: &str) -> String {
     // Header values may contain commas inside quoted client names.
     let parts: Vec<&str> = auth.split('"').collect();
     parts

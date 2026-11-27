@@ -19,7 +19,7 @@ pub fn now_ms() -> u64 {
 pub struct LogEntry {
     pub id: String,
     pub timestamp: u64,
-    pub level: String,
+    pub level: &'static str,
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub details: Option<String>,
@@ -39,15 +39,15 @@ pub struct Logs {
 }
 
 impl Logs {
-    pub fn add(&self, level: &str, message: impl Into<String>) {
+    pub fn add(&self, level: &'static str, message: impl Into<String>) {
         self.record(level, message.into(), None);
     }
 
-    pub fn detailed(&self, level: &str, message: impl Into<String>, details: Value) {
+    pub fn detailed(&self, level: &'static str, message: impl Into<String>, details: Value) {
         self.record(level, message.into(), Some(details.to_string()));
     }
 
-    fn record(&self, level: &str, message: String, details: Option<String>) {
+    fn record(&self, level: &'static str, mut message: String, mut details: Option<String>) {
         match level {
             "error" => tracing::error!(message, details = %details.as_deref().unwrap_or("")),
             "warn" => tracing::warn!(message, details = %details.as_deref().unwrap_or("")),
@@ -55,14 +55,20 @@ impl Logs {
             "trace" => tracing::trace!(message, details = %details.as_deref().unwrap_or("")),
             _ => tracing::info!(message, details = %details.as_deref().unwrap_or("")),
         }
+        message.shrink_to_fit();
+        if let Some(details) = details.as_mut() {
+            details.shrink_to_fit();
+        }
         let mut inner = self.inner.lock();
         inner.next += 1;
         let sequence = inner.next;
         let timestamp = now_ms();
+        let mut id = format!("{timestamp}-{sequence}");
+        id.shrink_to_fit();
         inner.entries.push_back(Arc::new(LogEntry {
-            id: format!("{timestamp}-{sequence}"),
+            id,
             timestamp,
-            level: level.into(),
+            level,
             message,
             details,
             sequence,

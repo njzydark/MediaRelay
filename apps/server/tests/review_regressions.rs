@@ -9,6 +9,7 @@ use axum::{
     Json, Router,
     extract::Request,
     http::StatusCode,
+    response::IntoResponse,
     routing::{get, post},
 };
 use common::{client, spawn, state};
@@ -304,4 +305,311 @@ async fn proxy_transport_failures_have_sanitized_stage_and_reason_details() {
         assert!(!text.contains("query-secret"));
         assert!(!text.contains("header-secret"));
     }
+}
+
+#[tokio::test]
+async fn emby_rewritten_direct_stream_url_preserves_auth_and_re_redirects_after_cache_expiry() {
+    for case in ["query_api_key", "upstream_direct_url", "emby_auth_header"] {
+        let items_hits = Arc::new(AtomicUsize::new(0));
+        let hits = items_hits.clone();
+        let upstream = spawn(
+            Router::new()
+                .route(
+                    "/emby/Items/71603/PlaybackInfo",
+                    post(move || async move {
+                        let mut source = json!({
+                            "Id": "mediasource_71603",
+                            "ItemId": "71603",
+                            "Path": "/media/movie.mkv",
+                            "Container": "mkv",
+                        });
+                        if case == "upstream_direct_url" {
+                            source["DirectStreamUrl"] =
+                                "/videos/71603/stream.mkv?Static=true&api_key=emby-secret".into();
+                        }
+                        Json(json!({"MediaSources": [source]}))
+                    }),
+                )
+                .route(
+                    "/emby/Items",
+                    get(move |request: Request| {
+                        let hits = hits.clone();
+                        async move {
+                            let query = request.uri().query().unwrap_or("");
+                            let authorized =
+                                url::form_urlencoded::parse(query.as_bytes()).any(|(k, v)| {
+                                    matches!(k.as_ref(), "api_key" | "X-Emby-Token")
+                                        && v == "emby-secret"
+                                });
+                            if !authorized {
+                                return (StatusCode::UNAUTHORIZED, "unauthorized").into_response();
+                            }
+                            hits.fetch_add(1, Ordering::SeqCst);
+                            Json(json!({"Items": [{"MediaSources": [{"Id": "mediasource_71603", "ItemId": "71603", "Path": "/media/movie.mkv"}]}]})).into_response()
+                        }
+                    }),
+                )
+                .route(
+                    "/api/fs/get",
+                    post(|| async {
+                        Json(json!({"code": 200, "data": {"raw_url": "https://cdn.test/movie.mkv"}}))
+                    }),
+                ),
+        )
+        .await;
+        let temp = tempfile::tempdir().unwrap();
+        let app = state(
+            &upstream.url,
+            json!({"openlist": {"baseUrl": upstream.url}}),
+            temp.path().join("config.json"),
+        );
+        let relay = spawn(router(app.clone(), temp.path().into())).await;
+        let http = client();
+        let playback_url = if case == "query_api_key" {
+            format!(
+                "{}/emby/Items/71603/PlaybackInfo?api_key=emby-secret",
+                relay.url
+            )
+        } else {
+            format!("{}/emby/Items/71603/PlaybackInfo", relay.url)
+        };
+        let mut req = http.post(playback_url);
+        if case == "emby_auth_header" {
+            req = req.header(
+                "x-emby-authorization",
+                r#"MediaBrowser Client="SenPlayer", Token="emby-secret""#,
+            );
+        }
+        let playback: Value = req.send().await.unwrap().json().await.unwrap();
+        let direct_url = playback["MediaSources"][0]["DirectStreamUrl"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert!(
+            direct_url.contains("api_key=emby-secret"),
+            "{case}: {direct_url}"
+        );
+
+        // Warm request without any auth headers hits Media cache and returns 302.
+        let warm = http.get(&direct_url).send().await.unwrap();
+        assert_eq!(warm.status(), StatusCode::FOUND, "{case}");
+        assert_eq!(warm.headers()["location"], "https://cdn.test/movie.mkv");
+        assert_eq!(items_hits.load(Ordering::SeqCst), 0, "{case}");
+
+        // Advance past the 3600s Media cache TTL (TTL stays 3600s).
+        tokio::time::pause();
+        tokio::time::advance(std::time::Duration::from_secs(3601)).await;
+        tokio::time::resume();
+
+        // Cold request with the same rewritten URL (no headers) re-queries /emby/Items with auth and returns 302.
+        let cold = http.get(&direct_url).send().await.unwrap();
+        assert_eq!(cold.status(), StatusCode::FOUND, "{case}");
+        assert_eq!(cold.headers()["location"], "https://cdn.test/movie.mkv");
+        assert_eq!(items_hits.load(Ordering::SeqCst), 1, "{case}");
+
+        // Auth secrets must never appear in diagnostic logs.
+        let logs = serde_json::to_string(&app.logs.list(None)).unwrap();
+        assert!(
+            !logs.contains("emby-secret"),
+            "{case}: token leaked in logs"
+        );
+    }
+}
+
+#[tokio::test]
+async fn jellyfin_rewritten_stream_url_preserves_auth_and_re_redirects_after_cache_expiry() {
+    let items_hits = Arc::new(AtomicUsize::new(0));
+    let hits = items_hits.clone();
+    let upstream = spawn(
+        Router::new()
+            .route(
+                "/Items/abc/PlaybackInfo",
+                post(|| async {
+                    Json(json!({"MediaSources": [{"Id": "abc", "Path": "/media/movie.mkv"}]}))
+                }),
+            )
+            .route(
+                "/Items",
+                get(move |request: Request| {
+                    let hits = hits.clone();
+                    async move {
+                        let auth = request
+                            .headers()
+                            .get("authorization")
+                            .and_then(|v| v.to_str().ok())
+                            .unwrap_or("");
+                        let query = request.uri().query().unwrap_or("");
+                        if !auth.contains(r#"Token="jf-secret""#) || !query.contains("userId=u1") {
+                            return (StatusCode::UNAUTHORIZED, "unauthorized").into_response();
+                        }
+                        hits.fetch_add(1, Ordering::SeqCst);
+                        Json(json!({"Items": [{"MediaSources": [{"Id": "abc", "Path": "/media/movie.mkv"}]}]})).into_response()
+                    }
+                }),
+            )
+            .route(
+                "/api/fs/get",
+                post(|| async {
+                    Json(json!({"code": 200, "data": {"raw_url": "https://cdn.test/jf.mkv"}}))
+                }),
+            ),
+    )
+    .await;
+    let temp = tempfile::tempdir().unwrap();
+    let app = state(
+        &upstream.url,
+        json!({
+            "emby": {"baseUrl": ""},
+            "jellyfin": {"baseUrl": upstream.url},
+            "openlist": {"baseUrl": upstream.url},
+        }),
+        temp.path().join("config.json"),
+    );
+    let relay = spawn(router(app.clone(), temp.path().into())).await;
+    let http = client();
+    let playback: Value = http
+        .post(format!("{}/Items/abc/PlaybackInfo?UserId=u1", relay.url))
+        .header(
+            "authorization",
+            r#"MediaBrowser Client="Jellyfin", Token="jf-secret""#,
+        )
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let stream_url = playback["MediaSources"][0]["StreamUrl"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(stream_url.contains("ApiKey=jf-secret"));
+    assert!(stream_url.contains("UserId=u1"));
+
+    let warm = http.get(&stream_url).send().await.unwrap();
+    assert_eq!(warm.status(), StatusCode::FOUND);
+    assert_eq!(items_hits.load(Ordering::SeqCst), 0);
+
+    tokio::time::pause();
+    tokio::time::advance(std::time::Duration::from_secs(3601)).await;
+    tokio::time::resume();
+
+    let cold = http.get(&stream_url).send().await.unwrap();
+    assert_eq!(cold.status(), StatusCode::FOUND);
+    assert_eq!(cold.headers()["location"], "https://cdn.test/jf.mkv");
+    assert_eq!(items_hits.load(Ordering::SeqCst), 1);
+
+    let logs = serde_json::to_string(&app.logs.list(None)).unwrap();
+    assert!(!logs.contains("jf-secret"));
+}
+
+#[tokio::test]
+async fn emby_multi_source_playback_hits_cache_by_media_source_id() {
+    let items_hits = Arc::new(AtomicUsize::new(0));
+    let hits = items_hits.clone();
+    let upstream = spawn(
+        Router::new()
+            .route(
+                "/emby/Items/71603/PlaybackInfo",
+                post(|| async {
+                    Json(json!({
+                        "MediaSources": [
+                            {"Id": "mediasource_100", "ItemId": "71603", "Path": "/media/1080p.mkv"},
+                            {"Id": "mediasource_200", "ItemId": "71603", "Path": "/media/4k.mkv"},
+                        ]
+                    }))
+                }),
+            )
+            .route(
+                "/emby/Items",
+                get(move || {
+                    let hits = hits.clone();
+                    async move {
+                        hits.fetch_add(1, Ordering::SeqCst);
+                        StatusCode::INTERNAL_SERVER_ERROR
+                    }
+                }),
+            )
+            .route(
+                "/api/fs/get",
+                post(|Json(body): Json<Value>| async move {
+                    let path = body["path"].as_str().unwrap();
+                    let name = path.rsplit('/').next().unwrap();
+                    Json(json!({"code": 200, "data": {"raw_url": format!("https://cdn.test/{name}")}}))
+                }),
+            ),
+    )
+    .await;
+    let temp = tempfile::tempdir().unwrap();
+    let app = state(
+        &upstream.url,
+        json!({"openlist": {"baseUrl": upstream.url}}),
+        temp.path().join("config.json"),
+    );
+    let relay = spawn(router(app, temp.path().into())).await;
+    let http = client();
+    let playback: Value = http
+        .post(format!("{}/emby/Items/71603/PlaybackInfo", relay.url))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    for (index, expected) in [
+        (0, "https://cdn.test/1080p.mkv"),
+        (1, "https://cdn.test/4k.mkv"),
+    ] {
+        let url = playback["MediaSources"][index]["DirectStreamUrl"]
+            .as_str()
+            .unwrap();
+        let response = http.get(url).send().await.unwrap();
+        assert_eq!(response.status(), StatusCode::FOUND);
+        assert_eq!(response.headers()["location"], expected);
+    }
+    assert_eq!(items_hits.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn config_update_applies_new_openlist_cache_max_age() {
+    let upstream = spawn(Router::new().route(
+        "/emby/Users/admin",
+        get(|| async { Json(json!({"Policy": {"IsAdministrator": true}})) }),
+    ))
+    .await;
+    let temp = tempfile::tempdir().unwrap();
+    let app = state(&upstream.url, json!({}), temp.path().join("config.json"));
+    let relay = spawn(router(app, temp.path().into())).await;
+    let http = client();
+    let updated = http
+        .post(format!("{}/mediarelay/api/config?userId=admin", relay.url))
+        .json(&json!({"openlist": {"cache": {"maxAge": 120_000}}}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(updated.status(), StatusCode::OK);
+    let cache_info: Value = http
+        .get(format!("{}/mediarelay/api/cache?userId=admin", relay.url))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(cache_info["maxAge"], 120_000);
+}
+
+#[test]
+fn auth_token_reads_x_emby_authorization_header() {
+    let mut headers = http::HeaderMap::new();
+    headers.insert(
+        "x-emby-authorization",
+        r#"MediaBrowser Client="SenPlayer, TV", Token="emby-header-token""#
+            .parse()
+            .unwrap(),
+    );
+    assert_eq!(
+        mediarelay::context::auth_token(&headers),
+        "emby-header-token"
+    );
 }

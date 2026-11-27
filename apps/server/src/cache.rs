@@ -24,7 +24,8 @@ impl<K: Eq + Hash + Clone, V: Clone> Cache<K, V> {
     }
 
     pub fn get(&mut self, key: &K) -> Option<V> {
-        self.prune();
+        let now = Instant::now();
+        self.prune_at(now);
         self.clock = self.clock.wrapping_add(1);
         self.entries.get_mut(key).map(|entry| {
             entry.touched = self.clock;
@@ -33,7 +34,8 @@ impl<K: Eq + Hash + Clone, V: Clone> Cache<K, V> {
     }
 
     pub fn insert(&mut self, key: K, value: V, ttl: Duration) {
-        self.prune();
+        let now = Instant::now();
+        self.prune_at(now);
         if ttl.is_zero() {
             return;
         }
@@ -52,7 +54,7 @@ impl<K: Eq + Hash + Clone, V: Clone> Cache<K, V> {
             key,
             Entry {
                 value,
-                expires: Instant::now() + ttl,
+                expires: now + ttl,
                 touched: self.clock,
             },
         );
@@ -62,7 +64,10 @@ impl<K: Eq + Hash + Clone, V: Clone> Cache<K, V> {
         self.entries.clear();
     }
     pub fn prune(&mut self) {
-        self.entries
-            .retain(|_, entry| entry.expires > Instant::now());
+        self.prune_at(Instant::now());
+    }
+
+    fn prune_at(&mut self, now: Instant) {
+        self.entries.retain(|_, entry| entry.expires > now);
     }
 }

@@ -1,9 +1,48 @@
-use std::net::IpAddr;
+use std::{
+    collections::{HashMap, VecDeque},
+    net::IpAddr,
+    sync::{Arc, OnceLock},
+};
 
 use http::HeaderMap;
+use parking_lot::Mutex;
 use serde_json::Value;
 
 use crate::context::{decode, header, string};
+
+const REGEX_CACHE_CAPACITY: usize = 64;
+
+#[derive(Default)]
+struct RegexCache {
+    order: VecDeque<String>,
+    entries: HashMap<String, Option<Arc<regress::Regex>>>,
+}
+
+impl RegexCache {
+    fn get_or_compile(&mut self, pattern: &str) -> Option<Arc<regress::Regex>> {
+        if let Some(cached) = self.entries.get(pattern) {
+            return cached.clone();
+        }
+        let compiled = regress::Regex::with_flags(pattern, "i").ok().map(Arc::new);
+        if self.entries.len() >= REGEX_CACHE_CAPACITY
+            && let Some(oldest) = self.order.pop_front()
+        {
+            self.entries.remove(&oldest);
+        }
+        let key = pattern.to_owned();
+        self.order.push_back(key.clone());
+        self.entries.insert(key, compiled.clone());
+        compiled
+    }
+}
+
+fn compiled_regex(pattern: &str) -> Option<Arc<regress::Regex>> {
+    static CACHE: OnceLock<Mutex<RegexCache>> = OnceLock::new();
+    CACHE
+        .get_or_init(|| Mutex::new(RegexCache::default()))
+        .lock()
+        .get_or_compile(pattern)
+}
 
 pub fn blocked(rules: &Value, headers: &HeaderMap, ip: &str, source: &Value) -> bool {
     matched_rule(rules, headers, ip, source).is_some()
@@ -65,8 +104,7 @@ fn matches(condition: &Value, headers: &HeaderMap, ip: &str, source: &Value) -> 
         "notContains" => !target.contains(&pattern),
         "startsWith" => target.starts_with(&pattern),
         "endsWith" => target.ends_with(&pattern),
-        "matches" => regress::Regex::with_flags(&pattern, "i")
-            .is_ok_and(|regex| regex.find(&target).is_some()),
+        "matches" => compiled_regex(&pattern).is_some_and(|regex| regex.find(&target).is_some()),
         _ => false,
     }
 }
@@ -90,5 +128,26 @@ pub fn private_ip(ip: &str) -> bool {
                     .is_some_and(|ip| private_ip(&ip.to_string()))
         }
         None => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{REGEX_CACHE_CAPACITY, RegexCache};
+
+    #[test]
+    fn regex_cache_reuses_compiled_patterns_and_stays_bounded() {
+        let mut cache = RegexCache::default();
+        let first = cache.get_or_compile(r"^/media/.*\.mkv$").unwrap();
+        let second = cache.get_or_compile(r"^/media/.*\.mkv$").unwrap();
+        assert!(std::sync::Arc::ptr_eq(&first, &second));
+        assert!(cache.get_or_compile("[").is_none());
+        assert!(cache.entries.contains_key("["));
+
+        for index in 0..(REGEX_CACHE_CAPACITY + 16) {
+            let pattern = format!("pattern_{index}");
+            assert!(cache.get_or_compile(&pattern).is_some());
+        }
+        assert!(cache.entries.len() <= REGEX_CACHE_CAPACITY);
     }
 }

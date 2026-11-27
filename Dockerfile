@@ -21,7 +21,7 @@ RUN cargo build --release --locked -p mediarelay
 
 FROM gcr.io/distroless/cc-debian12
 WORKDIR /app
-ENV CONFIG_DIR=/app/config STATIC_DIR=/app/static
+ENV CONFIG_DIR=/app/config STATIC_DIR=/app/static MALLOC_ARENA_MAX=2
 COPY --from=server /app/target/release/mediarelay ./mediarelay
 COPY --from=web /app/apps/server/static ./static
 EXPOSE 3000

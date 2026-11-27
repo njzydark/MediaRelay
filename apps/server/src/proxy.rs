@@ -1,13 +1,13 @@
-use std::{error::Error as StdError, time::Duration};
+use std::{error::Error as StdError, sync::Arc, time::Duration};
 
 use axum::{body::Body, response::Response};
 use bytes::{Bytes, BytesMut};
 use futures_util::StreamExt;
 use http::{HeaderMap, HeaderValue, Request, Uri, response::Parts};
 use http_body_util::BodyExt;
-use hyper_rustls::HttpsConnector;
+use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
 use hyper_util::{
-    client::legacy::{Client, connect::HttpConnector},
+    client::legacy::{Client, ResponseFuture, connect::HttpConnector},
     rt::TokioExecutor,
 };
 
@@ -18,7 +18,34 @@ use crate::{
     media::RequestInfo,
 };
 
-pub type ProxyClient = Client<HttpsConnector<HttpConnector>, Body>;
+#[derive(Clone)]
+pub enum ProxyClient {
+    Http(Client<HttpConnector, Body>),
+    Https(Client<HttpsConnector<HttpConnector>, Body>),
+}
+
+impl ProxyClient {
+    pub fn request(&self, req: Request<Body>) -> ResponseFuture {
+        match self {
+            Self::Http(client) => client.request(req),
+            Self::Https(client) => client.request(req),
+        }
+    }
+
+    pub fn is_https(&self) -> bool {
+        matches!(self, Self::Https(_))
+    }
+}
+
+pub fn tls_config() -> Result<rustls::ClientConfig> {
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let config = rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .map_err(|_| Error::Config("failed to configure TLS".into()))?
+        .with_webpki_roots()
+        .with_no_client_auth();
+    Ok(config)
+}
 
 pub fn client() -> ProxyClient {
     let connector = hyper_rustls::HttpsConnectorBuilder::new()
@@ -27,9 +54,38 @@ pub fn client() -> ProxyClient {
         .enable_http1()
         .enable_http2()
         .build();
-    Client::builder(TokioExecutor::new())
-        .pool_idle_timeout(Duration::from_secs(90))
-        .build(connector)
+    ProxyClient::Https(
+        Client::builder(TokioExecutor::new())
+            .pool_idle_timeout(Duration::from_secs(90))
+            .build(connector),
+    )
+}
+
+pub fn client_for(upstream: &url::Url, tls: Option<rustls::ClientConfig>) -> Result<ProxyClient> {
+    if upstream.scheme() == "http" {
+        let mut connector = HttpConnector::new();
+        connector.enforce_http(true);
+        return Ok(ProxyClient::Http(
+            Client::builder(TokioExecutor::new())
+                .pool_idle_timeout(Duration::from_secs(90))
+                .build(connector),
+        ));
+    }
+    let tls = match tls {
+        Some(tls) => tls,
+        None => tls_config()?,
+    };
+    let connector = hyper_rustls::HttpsConnectorBuilder::new()
+        .with_tls_config(tls)
+        .https_or_http()
+        .enable_http1()
+        .enable_http2()
+        .build();
+    Ok(ProxyClient::Https(
+        Client::builder(TokioExecutor::new())
+            .pool_idle_timeout(Duration::from_secs(90))
+            .build(connector),
+    ))
 }
 
 pub fn strip_hop_headers(headers: &mut HeaderMap) {
@@ -70,10 +126,10 @@ pub fn target_uri(config: &Config, uri: &Uri) -> Result<Uri> {
 
 pub async fn forward(
     client: &ProxyClient,
-    config: &Config,
+    config: &Arc<Config>,
     mut request: Request<Body>,
     rewrite: bool,
-    info: &RequestInfo,
+    info: &Arc<RequestInfo>,
     logs: &Logs,
 ) -> Result<Response> {
     let started = tokio::time::Instant::now();
@@ -96,9 +152,6 @@ pub async fn forward(
             .headers_mut()
             .insert("accept-encoding", HeaderValue::from_static("identity"));
     }
-    let mut context = info.details(serde_json::json!({
-        "operation": "proxy", "upstreamOrigin": config.upstream.origin().ascii_serialization(),
-    }));
     let response =
         match tokio::time::timeout(Duration::from_secs(30), client.request(request)).await {
             Ok(Ok(response)) => response,
@@ -107,18 +160,30 @@ pub async fn forward(
                     Ok(Err(error)) => transport_error(error),
                     _ => "timeout",
                 };
-                log_failure(logs, context, "response_headers", reason, started);
+                log_failure(
+                    logs,
+                    info,
+                    config,
+                    None,
+                    "response_headers",
+                    reason,
+                    started,
+                );
                 return Err(Error::Proxy);
             }
         };
     let (mut parts, body) = response.into_parts();
-    context["status"] = parts.status.as_u16().into();
+    let status = parts.status.as_u16();
     strip_hop_headers(&mut parts.headers);
     let logs = logs.clone();
+    let info = info.clone();
+    let config = config.clone();
     let body = body.map_err(move |error| {
         log_failure(
             &logs,
-            context.clone(),
+            &info,
+            &config,
+            Some(status),
             "response_body",
             transport_error(&error),
             started,
@@ -130,14 +195,23 @@ pub async fn forward(
 
 fn log_failure(
     logs: &Logs,
-    mut context: serde_json::Value,
+    info: &RequestInfo,
+    config: &Config,
+    status: Option<u16>,
     stage: &str,
     reason: &str,
     started: tokio::time::Instant,
 ) {
-    context["stage"] = stage.into();
-    context["reason"] = reason.into();
-    context["durationMs"] = (started.elapsed().as_millis() as u64).into();
+    let mut context = info.details(serde_json::json!({
+        "operation": "proxy",
+        "upstreamOrigin": config.upstream.origin().ascii_serialization(),
+        "stage": stage,
+        "reason": reason,
+        "durationMs": started.elapsed().as_millis() as u64,
+    }));
+    if let Some(status) = status {
+        context["status"] = status.into();
+    }
     logs.detailed("warn", "Upstream proxy transport failed", context);
 }
 
@@ -317,7 +391,7 @@ pub async fn read_json_checked(
 
 #[cfg(test)]
 mod tests {
-    use super::transport_error;
+    use super::{client_for, tls_config, transport_error};
 
     #[test]
     fn transport_error_classification_never_includes_untrusted_messages() {
@@ -332,5 +406,14 @@ mod tests {
         let error =
             std::io::Error::other(rustls::Error::General("secret certificate detail".into()));
         assert_eq!(transport_error(&error), "tls_failed");
+    }
+
+    #[test]
+    fn proxy_client_only_enables_tls_for_https_upstreams() {
+        let http_url = url::Url::parse("http://emby.default.svc.cluster.local:8096").unwrap();
+        let https_url = url::Url::parse("https://emby.example.com").unwrap();
+        assert!(!client_for(&http_url, None).unwrap().is_https());
+        let tls = tls_config().unwrap();
+        assert!(client_for(&https_url, Some(tls)).unwrap().is_https());
     }
 }

@@ -32,9 +32,11 @@ pub fn identify(kind: MediaKind, uri: &Uri) -> Action {
     if path == "/web/index.html" {
         return Action::Html;
     }
-    let parts: Vec<_> = path.trim_end_matches('/').split('/').collect();
-    let tail = parts.get(parts.len().saturating_sub(3)..).unwrap_or(&[]);
-    if let ["Items", id, "PlaybackInfo"] = tail
+    let mut tail = path.trim_end_matches('/').rsplit('/');
+    let last = tail.next();
+    let second = tail.next();
+    let third = tail.next();
+    if let (Some("Items"), Some(id), Some("PlaybackInfo")) = (third, second, last)
         && !id.is_empty()
     {
         return Action::PlaybackInfo;
@@ -47,18 +49,18 @@ pub fn identify(kind: MediaKind, uri: &Uri) -> Action {
     if path.contains(fake_path) && uri.query().unwrap_or("").contains("FakeDirectStream") {
         return Action::FakeDirect;
     }
-    if let ["Videos", id, "stream"] = tail
+    if let (Some("Videos"), Some(id), Some("stream")) = (third, second, last)
         && !id.is_empty()
     {
         return Action::Stream;
     }
-    if let ["Audio", id, endpoint] = tail
+    if let (Some("Audio"), Some(id), Some(endpoint)) = (third, second, last)
         && !id.is_empty()
-        && (*endpoint == "stream" || endpoint.starts_with("stream.") || *endpoint == "universal")
+        && (endpoint == "stream" || endpoint.starts_with("stream.") || endpoint == "universal")
     {
         return Action::Stream;
     }
-    if let ["Items", id, "Download"] = tail
+    if let (Some("Items"), Some(id), Some("Download")) = (third, second, last)
         && !id.is_empty()
     {
         return Action::Download;
@@ -87,7 +89,7 @@ impl RequestInfo {
         fields
     }
 
-    pub fn log(&self, logs: &Logs, level: &str, message: &str, fields: Value) {
+    pub fn log(&self, logs: &Logs, level: &'static str, message: &str, fields: Value) {
         logs.detailed(level, message, self.details(fields));
     }
 
@@ -102,12 +104,17 @@ impl RequestInfo {
         if let Some(id) = source.strip_prefix("mediasource_") {
             return id.into();
         }
-        let parts: Vec<_> = self.uri.path().split('/').collect();
-        parts
-            .windows(2)
-            .find(|p| matches!(p[0], "Items" | "Videos" | "Audio"))
-            .map(|p| p[1].to_owned())
-            .unwrap_or_else(|| query(&self.uri, "ItemId"))
+        let mut parts = self.uri.path().split('/');
+        let mut prev = parts.next();
+        for part in parts {
+            if let Some(segment) = prev
+                && matches!(segment, "Items" | "Videos" | "Audio")
+            {
+                return part.to_owned();
+            }
+            prev = Some(part);
+        }
+        query(&self.uri, "ItemId")
     }
 
     fn token(&self, kind: MediaKind) -> String {
@@ -121,7 +128,50 @@ impl RequestInfo {
                 return value;
             }
         }
-        auth_token(&self.headers)
+        let token = auth_token(&self.headers);
+        if !token.is_empty() {
+            return token;
+        }
+        for name in ["x-emby-token", "x-mediabrowser-token"] {
+            let value = header(&self.headers, name);
+            if !value.is_empty() {
+                return value.to_owned();
+            }
+        }
+        String::new()
+    }
+
+    fn emby_direct_auth(&self, source: &Value) -> Option<(&'static str, String)> {
+        for name in ["api_key", "X-Emby-Token"] {
+            let value = query(&self.uri, name);
+            if !value.is_empty() {
+                return Some((name, value));
+            }
+        }
+        if let Some(raw_url) = source.get("DirectStreamUrl").and_then(Value::as_str)
+            && let Some(query_str) = raw_url
+                .split_once('?')
+                .map(|(_, q)| q.split('#').next().unwrap_or(q))
+        {
+            for name in ["api_key", "X-Emby-Token"] {
+                if let Some((_, value)) = url::form_urlencoded::parse(query_str.as_bytes())
+                    .find(|(k, v)| k == name && !v.is_empty())
+                {
+                    return Some((name, value.into_owned()));
+                }
+            }
+        }
+        for name in ["x-emby-token", "x-mediabrowser-token"] {
+            let value = header(&self.headers, name);
+            if !value.is_empty() {
+                return Some(("X-Emby-Token", value.to_owned()));
+            }
+        }
+        let token = auth_token(&self.headers);
+        if !token.is_empty() {
+            return Some(("api_key", token));
+        }
+        None
     }
 
     fn api_headers(&self) -> HeaderMap {
@@ -280,6 +330,20 @@ impl Media {
                 .append_pair("MediaSourceId", id)
                 .append_pair("Static", "true")
                 .append_pair("FakeDirectStream", "true");
+            if config.kind == MediaKind::Emby {
+                if let Some((key, value)) = request.emby_direct_auth(source) {
+                    direct.query_pairs_mut().append_pair(key, &value);
+                }
+            } else {
+                let token = request.token(MediaKind::Jellyfin);
+                if !token.is_empty() {
+                    direct.query_pairs_mut().append_pair("ApiKey", &token);
+                }
+                let user_id = query(&request.uri, "UserId");
+                if !user_id.is_empty() {
+                    direct.query_pairs_mut().append_pair("UserId", &user_id);
+                }
+            }
             self.remember(source, false);
             request.log(&self.logs, "debug", "PlaybackInfo source cached and rewritten", json!({"decision": "rewrite", "sourceId": safe_id(id), "path": safe_path(string(source, "Path")), "generation": config.generation}));
             let Some(object) = source.as_object_mut() else {
@@ -312,7 +376,14 @@ impl Media {
     pub async fn source(&self, config: &Config, request: &RequestInfo) -> Option<Value> {
         let id = request.item_id();
         let source_id = query(&request.uri, "MediaSourceId");
-        let cached = self.cache.lock().get(&id);
+        let cached = {
+            let mut cache = self.cache.lock();
+            if !source_id.is_empty() && source_id != id {
+                cache.get(&source_id).or_else(|| cache.get(&id))
+            } else {
+                cache.get(&id)
+            }
+        };
         if let Some(path) = cached {
             request.log(
                 &self.logs,

@@ -58,30 +58,38 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(config: ConfigService) -> Result<Self> {
+        let snapshot = config.snapshot();
+        let tls = proxy::tls_config()?;
+        let proxy_tls = (snapshot.upstream.scheme() == "https").then(|| tls.clone());
         let client = reqwest::Client::builder()
+            .use_preconfigured_tls(tls)
             .redirect(reqwest::redirect::Policy::none())
             .connect_timeout(Duration::from_secs(10))
             .pool_idle_timeout(Duration::from_secs(90))
             .build()?;
         let logs = Logs::default();
         let storage = Storage::new(client.clone(), logs.clone());
-        if let Some(age) = config
-            .snapshot()
-            .document
-            .pointer("/openlist/cache/maxAge")
-            .and_then(Value::as_u64)
-            .filter(|age| *age <= 31_536_000_000)
-        {
-            storage.set_max_age(age);
-        }
+        apply_storage_max_age(&storage, &snapshot);
+        let proxy = proxy::client_for(&snapshot.upstream, proxy_tls)?;
         Ok(Self {
             config: Arc::new(config),
             storage,
             media: Media::new(client, logs.clone()),
             logs,
             shutdown: CancellationToken::new(),
-            proxy: proxy::client(),
+            proxy,
         })
+    }
+}
+
+fn apply_storage_max_age(storage: &Storage, config: &config::Config) {
+    if let Some(age) = config
+        .document
+        .pointer("/openlist/cache/maxAge")
+        .and_then(Value::as_u64)
+        .filter(|age| *age > 0 && *age <= 31_536_000_000)
+    {
+        storage.set_max_age(age);
     }
 }
 
@@ -99,9 +107,15 @@ pub fn router(state: AppState, static_dir: PathBuf) -> Router {
         .with_state(state)
 }
 
-fn request_info(request: &Request) -> RequestInfo {
-    if let Some(info) = request.extensions().get::<RequestInfo>() {
-        return info.clone();
+#[derive(Clone)]
+struct RequestContext {
+    info: Arc<RequestInfo>,
+    action: Action,
+}
+
+fn request_info(request: &Request) -> Arc<RequestInfo> {
+    if let Some(ctx) = request.extensions().get::<RequestContext>() {
+        return ctx.info.clone();
     }
     static NEXT_REQUEST: AtomicU64 = AtomicU64::new(1);
     let mut ip = context::real_ip(request.headers());
@@ -112,12 +126,12 @@ fn request_info(request: &Request) -> RequestInfo {
             .map(|v| v.0.ip().to_string())
             .unwrap_or_default();
     }
-    RequestInfo {
+    Arc::new(RequestInfo {
         request_id: NEXT_REQUEST.fetch_add(1, Ordering::Relaxed),
         uri: request.uri().clone(),
         headers: request.headers().clone(),
         client_ip: ip,
-    }
+    })
 }
 
 async fn request_logging(
@@ -127,20 +141,50 @@ async fn request_logging(
 ) -> Response {
     let started = tokio::time::Instant::now();
     let info = request_info(&request);
-    request.extensions_mut().insert(info.clone());
     let config = state.config.snapshot();
     let action = media::identify(config.kind, &info.uri);
-    let mut details = json!({"operation": "request", "method": request.method().as_str(), "action": format!("{action:?}"), "server": format!("{:?}", config.kind), "userAgent": logs::safe_path(info.ua()), "clientIp": logs::safe_path(&info.client_ip), "upstreamOrigin": config.upstream.origin().ascii_serialization()});
-    // Logging successful log polling/SSE auth would produce its own endless feed.
-    if !info.monitoring() {
+    let method = request.method().clone();
+    request.extensions_mut().insert(RequestContext {
+        info: info.clone(),
+        action,
+    });
+    let monitoring = info.monitoring();
+    let mut details = if !monitoring {
+        let details = json!({
+            "operation": "request",
+            "method": method.as_str(),
+            "action": format!("{action:?}"),
+            "server": format!("{:?}", config.kind),
+            "userAgent": logs::safe_path(info.ua()),
+            "clientIp": logs::safe_path(&info.client_ip),
+            "upstreamOrigin": config.upstream.origin().ascii_serialization(),
+        });
+        // Logging successful log polling/SSE auth would produce its own endless feed.
         info.log(&state.logs, "trace", "Request started", details.clone());
-    }
+        Some(details)
+    } else {
+        None
+    };
     let response = next.run(request).await;
-    details["status"] = response.status().as_u16().into();
-    details["durationMs"] = (started.elapsed().as_millis() as u64).into();
-    if response.status().is_client_error() || response.status().is_server_error() {
+    let status = response.status();
+    if status.is_client_error() || status.is_server_error() {
+        let mut details = details.take().unwrap_or_else(|| {
+            json!({
+                "operation": "request",
+                "method": method.as_str(),
+                "action": format!("{action:?}"),
+                "server": format!("{:?}", config.kind),
+                "userAgent": logs::safe_path(info.ua()),
+                "clientIp": logs::safe_path(&info.client_ip),
+                "upstreamOrigin": config.upstream.origin().ascii_serialization(),
+            })
+        });
+        details["status"] = status.as_u16().into();
+        details["durationMs"] = (started.elapsed().as_millis() as u64).into();
         info.log(&state.logs, "warn", "Request failed", details);
-    } else if !info.monitoring() {
+    } else if let Some(mut details) = details {
+        details["status"] = status.as_u16().into();
+        details["durationMs"] = (started.elapsed().as_millis() as u64).into();
         let level = if matches!(
             action,
             Action::Stream | Action::Download | Action::FakeDirect | Action::PlaybackInfo
@@ -155,17 +199,22 @@ async fn request_logging(
 }
 
 async fn relay(State(state): State<AppState>, mut request: Request) -> Result<Response> {
-    let info = request_info(&request);
     let config = state.config.snapshot();
+    let (info, action) = if let Some(ctx) = request.extensions().get::<RequestContext>() {
+        (ctx.info.clone(), ctx.action)
+    } else {
+        let info = request_info(&request);
+        let action = media::identify(config.kind, &info.uri);
+        (info, action)
+    };
     if context::header(&info.headers, "upgrade").eq_ignore_ascii_case("websocket") {
         let (mut parts, _) = request.into_parts();
         let ws = match WebSocketUpgrade::from_request_parts(&mut parts, &state).await {
             Ok(ws) => ws,
             Err(_) => return Ok(websocket::invalid_upgrade()),
         };
-        return websocket::upgrade(state, &config, info, ws).await;
+        return websocket::upgrade(state, &config, info.as_ref().clone(), ws).await;
     }
-    let action = media::identify(config.kind, &info.uri);
     match action {
         Action::Index => Ok((StatusCode::FOUND, [("location", "/web/index.html")]).into_response()),
         Action::Stream | Action::Download | Action::FakeDirect => {
@@ -292,6 +341,7 @@ async fn admin_api(State(state): State<AppState>, request: Request) -> Result<Re
         (&Method::POST, "/mediarelay/api/config") => {
             let config = state.config.update(json_body(request).await?).await?;
             state.storage.invalidate(config.generation);
+            apply_storage_max_age(&state.storage, &config);
             info.log(
                 &state.logs,
                 "info",

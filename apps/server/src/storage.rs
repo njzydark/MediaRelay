@@ -95,41 +95,35 @@ impl Storage {
         let cache_enabled =
             config.document.pointer("/openlist/cache/enabled") != Some(&Value::Bool(false));
         let key = (path.clone(), ua.to_owned());
-        let mut receiver = {
+        enum Decision {
+            Stale,
+            Cached(String),
+            Joined(Pending),
+            LimitReached,
+            Started(Pending),
+        }
+        let decision = {
             let mut inner = self.inner.lock();
             if config.generation < inner.generation {
-                details["reason"] = "stale_config_snapshot".into();
-                self.logs
-                    .detailed("debug", "Openlist resolution skipped", details);
-                return None;
-            }
-            if cache_enabled && let Some(url) = inner.cache.get(&key) {
-                self.logs
-                    .detailed("info", "Openlist direct URL cache hit", details);
-                return Some(url);
-            }
-            if let Some(receiver) = inner.pending.get(&key) {
-                self.logs.detailed(
-                    "debug",
-                    "Openlist request joined existing resolution",
-                    details,
-                );
-                receiver.clone()
+                Decision::Stale
+            } else if cache_enabled && let Some(url) = inner.cache.get(&key) {
+                Decision::Cached(url)
+            } else if let Some(receiver) = inner.pending.get(&key) {
+                Decision::Joined(receiver.clone())
+            } else if inner.pending.len() >= 500 {
+                Decision::LimitReached
             } else {
-                if inner.pending.len() >= 500 {
-                    details["reason"] = "pending_request_limit".into();
-                    self.logs
-                        .detailed("warn", "Openlist resolution skipped", details);
-                    return None;
-                }
                 let (sender, receiver) = watch::channel(None);
                 inner.pending.insert(key.clone(), receiver.clone());
                 let worker_receiver = receiver.clone();
                 let storage = self.clone();
                 let ua = ua.to_owned();
+                let worker_details = details.clone();
                 tokio::spawn(async move {
-                    let result = storage.fetch(&config, &path, &ua, details.clone()).await;
-                    {
+                    let result = storage
+                        .fetch(&config, &path, &ua, worker_details.clone())
+                        .await;
+                    let cached_ttl = {
                         let mut inner = storage.inner.lock();
                         // A configuration update or cache clear must not resurrect stale links.
                         if inner.generation == config.generation
@@ -141,23 +135,59 @@ impl Storage {
                             inner.pending.remove(&key);
                             if cache_enabled && let Some(url) = &result {
                                 let ttl = link_ttl(url, inner.max_age, now_ms());
-                                details["cacheTtlMs"] = ttl.into();
-                                storage.logs.detailed(
-                                    "debug",
-                                    "Openlist direct URL cache updated",
-                                    details,
-                                );
                                 inner
                                     .cache
                                     .insert(key, url.clone(), Duration::from_millis(ttl));
+                                Some(ttl)
+                            } else {
+                                None
                             }
+                        } else {
+                            None
                         }
+                    };
+                    if let Some(ttl) = cached_ttl {
+                        let mut log_details = worker_details;
+                        log_details["cacheTtlMs"] = ttl.into();
+                        storage.logs.detailed(
+                            "debug",
+                            "Openlist direct URL cache updated",
+                            log_details,
+                        );
                     }
                     let _ = sender.send(Some(result));
                 });
                 // The task owns its clone so cancellation of the initiating client is harmless.
+                Decision::Started(receiver)
+            }
+        };
+        let mut receiver = match decision {
+            Decision::Stale => {
+                details["reason"] = "stale_config_snapshot".into();
+                self.logs
+                    .detailed("debug", "Openlist resolution skipped", details);
+                return None;
+            }
+            Decision::Cached(url) => {
+                self.logs
+                    .detailed("info", "Openlist direct URL cache hit", details);
+                return Some(url);
+            }
+            Decision::Joined(receiver) => {
+                self.logs.detailed(
+                    "debug",
+                    "Openlist request joined existing resolution",
+                    details,
+                );
                 receiver
             }
+            Decision::LimitReached => {
+                details["reason"] = "pending_request_limit".into();
+                self.logs
+                    .detailed("warn", "Openlist resolution skipped", details);
+                return None;
+            }
+            Decision::Started(receiver) => receiver,
         };
         loop {
             if let Some(result) = receiver.borrow_and_update().clone() {
@@ -264,14 +294,20 @@ impl Storage {
     }
 
     pub fn clear(&self, path: &str, ua: &str) {
-        let mut inner = self.inner.lock();
-        let previous = inner.cache.entries.len();
-        let pending = inner.pending.len();
-        let keep =
-            |key: &Key| !((path.is_empty() || key.0 == path) && (ua.is_empty() || key.1 == ua));
-        inner.cache.entries.retain(|key, _| keep(key));
-        inner.pending.retain(|key, _| keep(key));
-        self.logs.detailed("info", "Openlist cache cleared", json!({"operation": "cache", "path": safe_path(path), "userAgent": safe_path(ua), "entriesRemoved": previous - inner.cache.entries.len(), "pendingDetached": pending - inner.pending.len()}));
+        let (entries_removed, pending_detached) = {
+            let mut inner = self.inner.lock();
+            let previous = inner.cache.entries.len();
+            let pending = inner.pending.len();
+            let keep =
+                |key: &Key| !((path.is_empty() || key.0 == path) && (ua.is_empty() || key.1 == ua));
+            inner.cache.entries.retain(|key, _| keep(key));
+            inner.pending.retain(|key, _| keep(key));
+            (
+                previous - inner.cache.entries.len(),
+                pending - inner.pending.len(),
+            )
+        };
+        self.logs.detailed("info", "Openlist cache cleared", json!({"operation": "cache", "path": safe_path(path), "userAgent": safe_path(ua), "entriesRemoved": entries_removed, "pendingDetached": pending_detached}));
     }
 
     pub fn set_max_age(&self, max_age: u64) {
