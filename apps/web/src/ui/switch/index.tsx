@@ -20,13 +20,7 @@ export const Switch = ({ checked, onCheckedChange, label, disabled, size = "medi
     <label className={classNames(styles.Label, className)}>
       {label && <span className={styles.LabelText}>{label}</span>}
       <span className={classNames(styles.SwitchWrapper, size === "small" && styles.Small)}>
-        <input
-          type="checkbox"
-          className={styles.Input}
-          checked={checked}
-          onChange={handleChange}
-          disabled={disabled}
-        />
+        <input type="checkbox" className={styles.Input} checked={checked} onChange={handleChange} disabled={disabled} />
         <span className={styles.Track} data-checked={checked}>
           <span className={styles.Thumb} />
         </span>

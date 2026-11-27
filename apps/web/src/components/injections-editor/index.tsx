@@ -82,13 +82,16 @@ export const InjectionsEditor = ({ value = [], onChange, disabled }: Props) => {
     setNewInjection(EmptyInjection());
   }, [newInjection, injections, onChange]);
 
-  const handleEdit = useCallback((index: number) => {
-    const injection = injections[index];
-    if (!injection) return;
-    setEditingIndex(index);
-    setEditForm({ ...injection });
-    setEditError(null);
-  }, [injections]);
+  const handleEdit = useCallback(
+    (index: number) => {
+      const injection = injections[index];
+      if (!injection) return;
+      setEditingIndex(index);
+      setEditForm({ ...injection });
+      setEditError(null);
+    },
+    [injections],
+  );
 
   const handleSaveEdit = useCallback(() => {
     setEditError(null);
@@ -121,10 +124,13 @@ export const InjectionsEditor = ({ value = [], onChange, disabled }: Props) => {
     setEditError(null);
   }, []);
 
-  const handleRemove = useCallback((index: number) => {
-    const newInjections = injections.filter((_, i) => i !== index);
-    onChange?.(newInjections);
-  }, [injections, onChange]);
+  const handleRemove = useCallback(
+    (index: number) => {
+      const newInjections = injections.filter((_, i) => i !== index);
+      onChange?.(newInjections);
+    },
+    [injections, onChange],
+  );
 
   const getInjectionLabel = (injection: Injection) => {
     if (injection.src) return `${injection.type}: ${injection.src}`;
@@ -137,80 +143,78 @@ export const InjectionsEditor = ({ value = [], onChange, disabled }: Props) => {
       <div className={styles.List}>
         {injections.map((injection, index) => (
           <div key={index} className={styles.Item}>
-            {editingIndex === index
-              ? (
-                <>
-                  <div className={styles.ItemEditing}>
-                    <RadioGroup
-                      value={editForm.type}
-                      onChange={(v) => setEditForm((prev) => ({ ...prev, type: v as "script" | "style" }))}
-                      options={typeOptions}
-                      disabled={disabled}
-                    />
-                    <Input
-                      value={editForm.src || ""}
-                      onChange={(v) => setEditForm((prev) => ({ ...prev, src: v || undefined }))}
-                      placeholder={t("injections.form.urlPlaceholder")}
-                      disabled={disabled}
-                    />
-                    <Input
-                      value={editForm.content || ""}
-                      onChange={(v) => setEditForm((prev) => ({ ...prev, content: v || undefined }))}
-                      placeholder={t("injections.form.contentPlaceholder")}
-                      disabled={disabled}
-                    />
-                    {editForm.type === "script" && (
-                      <div className={styles.CheckboxGroup}>
-                        <label className={styles.CheckboxLabel}>
-                          <Switch
-                            checked={editForm.async || false}
-                            onCheckedChange={(v) => setEditForm((prev) => ({ ...prev, async: v }))}
-                            disabled={disabled}
-                          />
-                          {t("injections.options.async")}
-                        </label>
-                        <label className={styles.CheckboxLabel}>
-                          <Switch
-                            checked={editForm.defer || false}
-                            onCheckedChange={(v) => setEditForm((prev) => ({ ...prev, defer: v }))}
-                            disabled={disabled}
-                          />
-                          {t("injections.options.defer")}
-                        </label>
-                      </div>
-                    )}
-                    {editError && <div className={styles.Error}>{editError}</div>}
-                  </div>
-                  <div className={styles.ItemActions}>
-                    <Button onClick={handleCancelEdit} disabled={disabled} title={t("common.cancel")}>
-                      <XIcon />
-                    </Button>
-                    <Button
-                      onClick={handleSaveEdit}
-                      disabled={disabled || (!editForm.src?.trim() && !editForm.content?.trim())}
-                      title={t("common.save")}
-                    >
-                      <CheckIcon />
-                    </Button>
-                  </div>
-                </>
-              )
-              : (
-                <>
-                  <div className={styles.ItemContent}>
-                    <span className={styles.Type}>{injection.type}</span>
-                    <span className={styles.Label}>{getInjectionLabel(injection)}</span>
-                  </div>
-                  <div className={styles.ItemActions}>
-                    <Button onClick={() => handleRemove(index)} disabled={disabled} title={t("common.delete")}>
-                      <TrashIcon />
-                    </Button>
-                    <Button onClick={() => handleEdit(index)} disabled={disabled} title={t("common.edit")}>
-                      <EditIcon />
-                    </Button>
-                  </div>
-                </>
-              )}
+            {editingIndex === index ? (
+              <>
+                <div className={styles.ItemEditing}>
+                  <RadioGroup
+                    value={editForm.type}
+                    onChange={(v) => setEditForm((prev) => ({ ...prev, type: v as "script" | "style" }))}
+                    options={typeOptions}
+                    disabled={disabled}
+                  />
+                  <Input
+                    value={editForm.src || ""}
+                    onChange={(v) => setEditForm((prev) => ({ ...prev, src: v || undefined }))}
+                    placeholder={t("injections.form.urlPlaceholder")}
+                    disabled={disabled}
+                  />
+                  <Input
+                    value={editForm.content || ""}
+                    onChange={(v) => setEditForm((prev) => ({ ...prev, content: v || undefined }))}
+                    placeholder={t("injections.form.contentPlaceholder")}
+                    disabled={disabled}
+                  />
+                  {editForm.type === "script" && (
+                    <div className={styles.CheckboxGroup}>
+                      <label className={styles.CheckboxLabel}>
+                        <Switch
+                          checked={editForm.async || false}
+                          onCheckedChange={(v) => setEditForm((prev) => ({ ...prev, async: v }))}
+                          disabled={disabled}
+                        />
+                        {t("injections.options.async")}
+                      </label>
+                      <label className={styles.CheckboxLabel}>
+                        <Switch
+                          checked={editForm.defer || false}
+                          onCheckedChange={(v) => setEditForm((prev) => ({ ...prev, defer: v }))}
+                          disabled={disabled}
+                        />
+                        {t("injections.options.defer")}
+                      </label>
+                    </div>
+                  )}
+                  {editError && <div className={styles.Error}>{editError}</div>}
+                </div>
+                <div className={styles.ItemActions}>
+                  <Button onClick={handleCancelEdit} disabled={disabled} title={t("common.cancel")}>
+                    <XIcon />
+                  </Button>
+                  <Button
+                    onClick={handleSaveEdit}
+                    disabled={disabled || (!editForm.src?.trim() && !editForm.content?.trim())}
+                    title={t("common.save")}
+                  >
+                    <CheckIcon />
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={styles.ItemContent}>
+                  <span className={styles.Type}>{injection.type}</span>
+                  <span className={styles.Label}>{getInjectionLabel(injection)}</span>
+                </div>
+                <div className={styles.ItemActions}>
+                  <Button onClick={() => handleRemove(index)} disabled={disabled} title={t("common.delete")}>
+                    <TrashIcon />
+                  </Button>
+                  <Button onClick={() => handleEdit(index)} disabled={disabled} title={t("common.edit")}>
+                    <EditIcon />
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         ))}
         {injections.length === 0 && <div className={styles.Empty}>{t("injections.empty")}</div>}

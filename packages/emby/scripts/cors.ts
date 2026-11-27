@@ -16,7 +16,8 @@ const originalSetAttribute = Element.prototype.setAttribute;
 Element.prototype.setAttribute = function (this: Element, ...args: string[]) {
   const name = args[0];
   if (
-    typeof name === "string" && name.toLowerCase() === "crossorigin" &&
+    typeof name === "string" &&
+    name.toLowerCase() === "crossorigin" &&
     (this.tagName === "VIDEO" || this.tagName === "AUDIO")
   ) {
     console.log(`[Bypass] Blocked setAttribute crossorigin on ${this.tagName}`);

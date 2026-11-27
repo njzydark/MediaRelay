@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "paths": { "@lib/shared": ["../shared/mod.ts"] }, "moduleDetection": "force" },
+  "include": ["scripts/**/*.ts", "types.ts", "rslib.config.ts"]
+}

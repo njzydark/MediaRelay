@@ -1,4 +1,3 @@
-// deno-lint-ignore-file ban-types
 import type { ExternalPlayerConfig } from "@lib/shared";
 import type { User, UserItem, UserItemsApiResponse } from "../types.ts";
 
@@ -57,7 +56,7 @@ declare global {
   }
 
   interface WindowEventMap {
-    "viewshow": ViewShowEvent;
+    viewshow: ViewShowEvent;
   }
 }
 

@@ -1,15 +1,8 @@
 {
-  "deno.enable": true,
-  "deno.lint": true,
-  "deno.codeLens.test": true,
   "editor.formatOnSave": true,
-  "[typescript]": {
-    "editor.defaultFormatter": "denoland.vscode-deno"
-  },
-  "[json]": {
-    "editor.defaultFormatter": "denoland.vscode-deno"
-  },
-  "[less]": {
-    "editor.defaultFormatter": "denoland.vscode-deno"
-  },
+  "[rust]": { "editor.defaultFormatter": "rust-lang.rust-analyzer" },
+  "[typescript]": { "editor.defaultFormatter": "oxc.oxc-vscode" },
+  "[typescriptreact]": { "editor.defaultFormatter": "oxc.oxc-vscode" },
+  "[json]": { "editor.defaultFormatter": "oxc.oxc-vscode" },
+  "[less]": { "editor.defaultFormatter": "oxc.oxc-vscode" }
 }

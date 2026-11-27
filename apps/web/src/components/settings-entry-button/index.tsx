@@ -32,9 +32,7 @@ export const SettingsEntryButton = ({ className, style, onClick }: Props) => {
             </i>
           </div>
           <div className="actionsheetListItemBody actionsheetListItemBody-iconright listItemBody listItemBody-reduceypadding listItemBody-2-lines">
-            <div className="listItemBodyText actionSheetItemText listItemBodyText-lf">
-              {t("app.title")}
-            </div>
+            <div className="listItemBodyText actionSheetItemText listItemBodyText-lf">{t("app.title")}</div>
           </div>
         </div>
       </button>

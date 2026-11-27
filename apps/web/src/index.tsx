@@ -61,14 +61,10 @@ init((root) => {
           }
 
           setTimeout(() => {
-            const targetBtn = dialogEl.querySelector<HTMLButtonElement>(
-              'button[data-id="manageserver"]',
-            );
+            const targetBtn = dialogEl.querySelector<HTMLButtonElement>('button[data-id="manageserver"]');
             if (!targetBtn) return;
 
-            const injectedBtn = dialogEl.querySelector<HTMLButtonElement>(
-              'button[data-id="mediarelay-settings"]',
-            );
+            const injectedBtn = dialogEl.querySelector<HTMLButtonElement>('button[data-id="mediarelay-settings"]');
             if (injectedBtn) return;
 
             const container = document.createElement("div");

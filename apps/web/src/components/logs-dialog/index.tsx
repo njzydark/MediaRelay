@@ -22,13 +22,6 @@ type Props = {
   children: React.ReactElement;
 };
 
-interface ApiClientType {
-  _userAuthInfo?: {
-    UserId: string;
-    AccessToken: string;
-  };
-}
-
 const getCommponRequestParams = () => {
   const userId = globalThis.ApiClient?._userAuthInfo?.UserId || globalThis.ApiClient?._serverInfo?.UserId;
   const token = globalThis.ApiClient?._userAuthInfo?.AccessToken || globalThis.ApiClient?._serverInfo?.AccessToken;
@@ -50,14 +43,17 @@ export const LogsDialog = ({ children, apiBaseUrl = "/mediarelay" }: Props) => {
   const logsContainerRef = useRef<HTMLDivElement>(null);
   const isUserScrollingRef = useRef(false);
 
-  const logLevelOptions = useMemo(() => [
-    { value: "all", label: t("logs.levels.all") },
-    { value: "trace", label: t("logs.levels.trace") },
-    { value: "debug", label: t("logs.levels.debug") },
-    { value: "info", label: t("logs.levels.info") },
-    { value: "warn", label: t("logs.levels.warn") },
-    { value: "error", label: t("logs.levels.error") },
-  ], [t]);
+  const logLevelOptions = useMemo(
+    () => [
+      { value: "all", label: t("logs.levels.all") },
+      { value: "trace", label: t("logs.levels.trace") },
+      { value: "debug", label: t("logs.levels.debug") },
+      { value: "info", label: t("logs.levels.info") },
+      { value: "warn", label: t("logs.levels.warn") },
+      { value: "error", label: t("logs.levels.error") },
+    ],
+    [t],
+  );
 
   const filteredLogs = useMemo(() => {
     if (logLevel === "all") return logs;
@@ -77,9 +73,7 @@ export const LogsDialog = ({ children, apiBaseUrl = "/mediarelay" }: Props) => {
     try {
       const { userId, token } = getCommponRequestParams();
       // 修改：不传递 since 参数，获取所有历史日志
-      const response = await fetch(
-        `${apiBaseUrl}/api/logs?userId=${userId}&token=${token}`,
-      );
+      const response = await fetch(`${apiBaseUrl}/api/logs?userId=${userId}&token=${token}`);
       const data = await response.json();
       if (data.logs && Array.isArray(data.logs)) {
         setLogs(data.logs);
@@ -96,9 +90,7 @@ export const LogsDialog = ({ children, apiBaseUrl = "/mediarelay" }: Props) => {
 
     const { userId, token } = getCommponRequestParams();
     // 修改：SSE 连接从当前时间开始，只接收新日志
-    const eventSource = new EventSource(
-      `${apiBaseUrl}/api/logs/stream?userId=${userId}&token=${token}`,
-    );
+    const eventSource = new EventSource(`${apiBaseUrl}/api/logs/stream?userId=${userId}&token=${token}`);
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => setIsConnected(true);
@@ -120,8 +112,7 @@ export const LogsDialog = ({ children, apiBaseUrl = "/mediarelay" }: Props) => {
 
     eventSource.onerror = () => {
       setIsConnected(false);
-      eventSource.close();
-      setTimeout(() => connectEventSource(), 3000);
+      // EventSource reconnects itself; closing it here leaks manual retry timers after unmount.
     };
   }, [apiBaseUrl]);
 
@@ -211,9 +202,7 @@ export const LogsDialog = ({ children, apiBaseUrl = "/mediarelay" }: Props) => {
     <div className={styles.toolbarActions}>
       <div className={styles.toolbarLeft}>
         <div className={styles.status}>
-          <span
-            className={`${styles.statusDot} ${isConnected ? styles.statusConnected : styles.statusDisconnected}`}
-          />
+          <span className={`${styles.statusDot} ${isConnected ? styles.statusConnected : styles.statusDisconnected}`} />
           <span className={styles.statusText}>
             {isConnected ? t("logs.status.connected") : t("logs.status.disconnected")}
           </span>
@@ -249,18 +238,18 @@ export const LogsDialog = ({ children, apiBaseUrl = "/mediarelay" }: Props) => {
         <div className={styles.container}>
           {toolbarActions}
           <div ref={logsContainerRef} className={styles.logsContainer} onScroll={handleScroll}>
-            {filteredLogs.length === 0
-              ? <div className={styles.empty}>{t("logs.empty")}</div>
-              : filteredLogs.map((log) => (
+            {filteredLogs.length === 0 ? (
+              <div className={styles.empty}>{t("logs.empty")}</div>
+            ) : (
+              filteredLogs.map((log) => (
                 <div key={log.id} className={`${styles.logEntry} ${getLevelClass(log.level)}`}>
                   <span className={styles.timestamp}>{formatTime(log.timestamp)}</span>
-                  <span className={`${styles.level} ${getLevelClass(log.level)}`}>
-                    [{log.level.toUpperCase()}]
-                  </span>
+                  <span className={`${styles.level} ${getLevelClass(log.level)}`}>[{log.level.toUpperCase()}]</span>
                   <span className={styles.message}>{log.message}</span>
                   {log.details && <span className={styles.details}>{log.details}</span>}
                 </div>
-              ))}
+              ))
+            )}
           </div>
           {/* 滚动到底部按钮 */}
           {showScrollToBottom && (

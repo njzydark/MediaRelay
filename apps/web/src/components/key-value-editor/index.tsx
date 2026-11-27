@@ -13,13 +13,7 @@ type Props = {
   valuePlaceholder?: string;
 };
 
-export const KeyValueEditor = ({
-  value = {},
-  onChange,
-  disabled,
-  keyPlaceholder,
-  valuePlaceholder,
-}: Props) => {
+export const KeyValueEditor = ({ value = {}, onChange, disabled, keyPlaceholder, valuePlaceholder }: Props) => {
   const { t } = useTranslation();
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState("");
@@ -80,50 +74,48 @@ export const KeyValueEditor = ({
       <div className={styles.List}>
         {entries.map(([key, val]) => (
           <div key={key} className={styles.Item}>
-            {editingKey === key
-              ? (
-                <>
-                  <div className={styles.ItemEditing}>
-                    <Input
-                      value={editKey}
-                      onChange={setEditKey}
-                      placeholder={keyPlaceholder || t("keyValue.keyPlaceholder")}
-                      disabled={disabled}
-                    />
-                    <Input
-                      value={editValue}
-                      onChange={setEditValue}
-                      placeholder={valuePlaceholder || t("keyValue.valuePlaceholder")}
-                      disabled={disabled}
-                    />
-                  </div>
-                  <div className={styles.ItemActions}>
-                    <Button onClick={handleEditCancel} disabled={disabled} title={t("common.cancel")}>
-                      <XIcon />
-                    </Button>
-                    <Button onClick={handleEditSave} disabled={disabled || !editKey.trim()} title={t("common.save")}>
-                      <CheckIcon />
-                    </Button>
-                  </div>
-                </>
-              )
-              : (
-                <>
-                  <div className={styles.ItemContent}>
-                    <span className={styles.Key}>{key}</span>
-                    <span className={styles.Arrow}>→</span>
-                    <span className={styles.Value}>{val}</span>
-                  </div>
-                  <div className={styles.ItemActions}>
-                    <Button onClick={() => handleRemove(key)} disabled={disabled} title={t("common.delete")}>
-                      <TrashIcon />
-                    </Button>
-                    <Button onClick={() => handleEditStart(key, val)} disabled={disabled} title={t("common.edit")}>
-                      <EditIcon />
-                    </Button>
-                  </div>
-                </>
-              )}
+            {editingKey === key ? (
+              <>
+                <div className={styles.ItemEditing}>
+                  <Input
+                    value={editKey}
+                    onChange={setEditKey}
+                    placeholder={keyPlaceholder || t("keyValue.keyPlaceholder")}
+                    disabled={disabled}
+                  />
+                  <Input
+                    value={editValue}
+                    onChange={setEditValue}
+                    placeholder={valuePlaceholder || t("keyValue.valuePlaceholder")}
+                    disabled={disabled}
+                  />
+                </div>
+                <div className={styles.ItemActions}>
+                  <Button onClick={handleEditCancel} disabled={disabled} title={t("common.cancel")}>
+                    <XIcon />
+                  </Button>
+                  <Button onClick={handleEditSave} disabled={disabled || !editKey.trim()} title={t("common.save")}>
+                    <CheckIcon />
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={styles.ItemContent}>
+                  <span className={styles.Key}>{key}</span>
+                  <span className={styles.Arrow}>→</span>
+                  <span className={styles.Value}>{val}</span>
+                </div>
+                <div className={styles.ItemActions}>
+                  <Button onClick={() => handleRemove(key)} disabled={disabled} title={t("common.delete")}>
+                    <TrashIcon />
+                  </Button>
+                  <Button onClick={() => handleEditStart(key, val)} disabled={disabled} title={t("common.edit")}>
+                    <EditIcon />
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         ))}
         {entries.length === 0 && <div className={styles.Empty}>{t("keyValue.empty")}</div>}

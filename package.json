@@ -1,0 +1,25 @@
+{
+  "name": "mediarelay",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm build && cargo run -p mediarelay",
+    "dev:web": "pnpm --filter @mediarelay/web dev",
+    "build": "pnpm --filter @mediarelay/web build && pnpm --filter @lib/emby build && pnpm --filter @lib/jellyfin build && node scripts/copy-static.mjs",
+    "build:server": "cargo build --release --locked",
+    "check": "tsc --noEmit -p apps/web && tsc --noEmit -p packages/emby && tsc --noEmit -p packages/jellyfin && tsc --noEmit -p packages/shared",
+    "test": "node --test packages/shared/*.test.ts apps/web/src/*.test.ts",
+    "lint": "oxlint --deny-warnings apps/web packages scripts",
+    "fmt": "oxfmt --write .",
+    "fmt:check": "oxfmt --check ."
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "oxfmt": "0.74.0",
+    "oxlint": "1.89.0",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "packageManager": "pnpm@12.15.0"
+}

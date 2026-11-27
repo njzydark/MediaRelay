@@ -1,0 +1,16 @@
+{
+  "name": "@lib/emby",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "rslib build",
+    "dev": "rslib build --watch"
+  },
+  "dependencies": {
+    "@lib/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@rslib/core": "0.19.5"
+  }
+}

@@ -33,10 +33,7 @@ const CONDITION_OP_COMMON_OPTIONS = [
   { value: "matches", label: "匹配正则" },
 ];
 
-const CONDITION_OP_IP_OPTIONS = [
-  ...CONDITION_OP_COMMON_OPTIONS,
-  { value: "isPrivateIp", label: "内网IP" },
-];
+const CONDITION_OP_IP_OPTIONS = [...CONDITION_OP_COMMON_OPTIONS, { value: "isPrivateIp", label: "内网IP" }];
 
 const CONDITION_OP_MEDIA_TYPE_OPTIONS = [
   { value: "isLocalFile", label: "为本地文件" },
@@ -63,11 +60,7 @@ const LOGIC_OPTIONS = [
   { value: "OR", label: "任一满足" },
 ];
 
-export const FilterRulesEditor = ({
-  value = [],
-  onChange,
-  disabled,
-}: Props) => {
+export const FilterRulesEditor = ({ value = [], onChange, disabled }: Props) => {
   const [expandedRules, setExpandedRules] = useState<Set<string>>(new Set());
 
   const handleAddRule = () => {
@@ -92,7 +85,7 @@ export const FilterRulesEditor = ({
   };
 
   const handleUpdateRule = (ruleId: string, updates: Partial<FilterRule>) => {
-    onChange?.(value.map((r) => r.id === ruleId ? { ...r, ...updates } : r));
+    onChange?.(value.map((r) => (r.id === ruleId ? { ...r, ...updates } : r)));
   };
 
   const handleAddCondition = (ruleId: string) => {
@@ -117,11 +110,7 @@ export const FilterRulesEditor = ({
     }
   };
 
-  const handleUpdateCondition = (
-    ruleId: string,
-    index: number,
-    updates: Partial<FilterCondition>,
-  ) => {
+  const handleUpdateCondition = (ruleId: string, index: number, updates: Partial<FilterCondition>) => {
     const rule = value.find((r) => r.id === ruleId);
     if (rule) {
       const newConditions = [...rule.conditions];
@@ -172,8 +161,8 @@ export const FilterRulesEditor = ({
       CONDITION_TYPE_OPTIONS.find((o: { value: string; label: string }) => o.value === condition.type)?.label ||
       condition.type;
     const opOptions = getOpOptionsByType(condition.type);
-    const opLabel = opOptions.find((o: { value: string; label: string }) => o.value === condition.op)?.label ||
-      condition.op;
+    const opLabel =
+      opOptions.find((o: { value: string; label: string }) => o.value === condition.op)?.label || condition.op;
     if (!opNeedsValue(condition.op)) {
       return `${typeLabel} ${opLabel}`;
     }
@@ -186,11 +175,7 @@ export const FilterRulesEditor = ({
       <div className={styles.RulesList}>
         {value.length === 0 && <div className={styles.Empty}>暂无规则，点击下方按钮添加</div>}
         {value.map((rule, ruleIndex) => (
-          <div
-            key={rule.id}
-            className={styles.RuleCard}
-            data-enabled={rule.enabled}
-          >
+          <div key={rule.id} className={styles.RuleCard} data-enabled={rule.enabled}>
             <div className={styles.RuleHeader}>
               <div className={styles.RuleTitle}>
                 <div className={styles.RuleInfo} onClick={() => toggleExpand(rule.id)}>
@@ -247,15 +232,15 @@ export const FilterRulesEditor = ({
                       <Select
                         value={condition.type}
                         onChange={(v) =>
-                          handleUpdateCondition(rule.id, condIndex, { type: v as FilterCondition["type"] })}
+                          handleUpdateCondition(rule.id, condIndex, { type: v as FilterCondition["type"] })
+                        }
                         options={CONDITION_TYPE_OPTIONS}
                         size="small"
                         className={styles.TypeSelect}
                       />
                       <Select
                         value={condition.op}
-                        onChange={(v) =>
-                          handleUpdateCondition(rule.id, condIndex, { op: v as FilterCondition["op"] })}
+                        onChange={(v) => handleUpdateCondition(rule.id, condIndex, { op: v as FilterCondition["op"] })}
                         options={getOpOptionsByType(condition.type)}
                         size="small"
                         className={styles.OpSelect}
@@ -271,8 +256,7 @@ export const FilterRulesEditor = ({
                         />
                       )}
                       <Button
-                        onClick={() =>
-                          handleRemoveCondition(rule.id, condIndex)}
+                        onClick={() => handleRemoveCondition(rule.id, condIndex)}
                         disabled={disabled}
                         title="删除"
                         size="small"
@@ -286,9 +270,7 @@ export const FilterRulesEditor = ({
 
                 {rule.conditions.length > 0 && (
                   <div className={styles.ConditionsSummary}>
-                    {rule.conditions.map(getConditionSummary).join(
-                      rule.logic === "AND" ? " 且 " : " 或 ",
-                    )}
+                    {rule.conditions.map(getConditionSummary).join(rule.logic === "AND" ? " 且 " : " 或 ")}
                   </div>
                 )}
 
@@ -306,26 +288,15 @@ export const FilterRulesEditor = ({
             )}
 
             {!isExpanded(rule.id) && rule.conditions.length > 0 && (
-              <div
-                className={styles.RuleSummary}
-                onClick={() => toggleExpand(rule.id)}
-                title="点击展开规则"
-              >
-                {rule.conditions.map(getConditionSummary).join(
-                  rule.logic === "AND" ? " 且 " : " 或 ",
-                )}
+              <div className={styles.RuleSummary} onClick={() => toggleExpand(rule.id)} title="点击展开规则">
+                {rule.conditions.map(getConditionSummary).join(rule.logic === "AND" ? " 且 " : " 或 ")}
               </div>
             )}
           </div>
         ))}
       </div>
 
-      <Button
-        onClick={handleAddRule}
-        disabled={disabled}
-        title="添加规则"
-        className={styles.AddRuleButton}
-      >
+      <Button onClick={handleAddRule} disabled={disabled} title="添加规则" className={styles.AddRuleButton}>
         <PlusIcon />
         添加规则
       </Button>

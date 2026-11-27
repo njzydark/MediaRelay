@@ -1,0 +1,8 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react"],
+  "categories": { "correctness": "error" },
+  "env": { "browser": true, "node": true },
+  "ignorePatterns": ["**/node_modules/**", "**/dist/**", "apps/server/**", "target/**"],
+  "rules": { "typescript/no-explicit-any": "off", "react/set-state-in-effect": "off" }
+}

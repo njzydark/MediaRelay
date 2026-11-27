@@ -16,9 +16,16 @@ type Props = {
   onOpenChange?: (open: boolean) => void;
 };
 
-export const Dialog = (
-  { children, title, desc, content, hideFooter, showCloseIcon = true, footer, onOpenChange }: Props,
-) => {
+export const Dialog = ({
+  children,
+  title,
+  desc,
+  content,
+  hideFooter,
+  showCloseIcon = true,
+  footer,
+  onOpenChange,
+}: Props) => {
   return (
     <Root onOpenChange={onOpenChange}>
       <Trigger render={children} />
@@ -50,21 +57,9 @@ export const Dialog = (
                 )}
               </div>
             )}
-            {desc && (
-              <Description className={styles.Description}>
-                {desc}
-              </Description>
-            )}
-            {content && (
-              <div className={styles.Content}>
-                {content}
-              </div>
-            )}
-            {!hideFooter && (
-              <div className={styles.Footer}>
-                {footer ?? <Close render={<Button>Close</Button>} />}
-              </div>
-            )}
+            {desc && <Description className={styles.Description}>{desc}</Description>}
+            {content && <div className={styles.Content}>{content}</div>}
+            {!hideFooter && <div className={styles.Footer}>{footer ?? <Close render={<Button>Close</Button>} />}</div>}
           </Popup>
         </Viewport>
       </Portal>

@@ -1,0 +1,712 @@
+[
+  {
+    "kind": "emby",
+    "scenario": "normal",
+    "config": {
+      "webDirect": true,
+      "webDirectLocalFallback": true
+    },
+    "blocked": false,
+    "input": {
+      "PlaySessionId": "session",
+      "ServerExtension": {
+        "status": "FutureEnum",
+        "nested": [
+          null,
+          {
+            "untouched": true
+          }
+        ]
+      },
+      "MediaSources": [
+        {
+          "Id": "mediasource_1",
+          "ItemId": "1",
+          "Path": "/media/movie.mkv",
+          "Name": "Test movie",
+          "Container": "mkv",
+          "SupportsTranscoding": true,
+          "SupportsDirectPlay": false,
+          "SupportsDirectStream": false,
+          "TranscodeReasons": ["VideoCodecNotSupported"],
+          "TranscodingUrl": "/transcode",
+          "TranscodingContainer": "ts",
+          "TranscodingSubProtocol": "hls",
+          "Protocol": "File",
+          "MediaStreams": [
+            {
+              "Type": "Video",
+              "Codec": "futureCodec",
+              "Extra": {
+                "array": [1, false, null]
+              }
+            }
+          ],
+          "VendorData": {
+            "version": 7,
+            "flags": ["unknown"]
+          }
+        },
+        {
+          "Id": "second",
+          "ItemId": "2",
+          "Path": "/media/second.mkv",
+          "MediaStreams": [
+            {
+              "Type": "Audio",
+              "Codec": "eac3",
+              "IsDefault": true
+            }
+          ],
+          "KeepMe": null
+        }
+      ]
+    },
+    "expected": {
+      "PlaySessionId": "session",
+      "ServerExtension": {
+        "status": "FutureEnum",
+        "nested": [
+          null,
+          {
+            "untouched": true
+          }
+        ]
+      },
+      "MediaSources": [
+        {
+          "Id": "mediasource_1",
+          "ItemId": "1",
+          "Path": "/media/movie.mkv",
+          "Name": "Test movie",
+          "Container": "mkv",
+          "SupportsTranscoding": false,
+          "SupportsDirectPlay": true,
+          "SupportsDirectStream": true,
+          "TranscodeReasons": [],
+          "TranscodingUrl": "/transcode",
+          "TranscodingContainer": "ts",
+          "TranscodingSubProtocol": "hls",
+          "Protocol": "Http",
+          "MediaStreams": [
+            {
+              "Type": "Video",
+              "Codec": "futureCodec",
+              "Extra": {
+                "array": [1, false, null]
+              }
+            }
+          ],
+          "VendorData": {
+            "version": 7,
+            "flags": ["unknown"]
+          },
+          "DirectStreamUrl": "http://relay.test/Videos/1/stream?MediaSourceId=mediasource_1&Static=true&FakeDirectStream=true"
+        },
+        {
+          "Id": "second",
+          "ItemId": "2",
+          "Path": "/media/second.mkv",
+          "MediaStreams": [
+            {
+              "Type": "Audio",
+              "Codec": "eac3",
+              "IsDefault": true
+            }
+          ],
+          "KeepMe": null
+        }
+      ]
+    }
+  },
+  {
+    "kind": "emby",
+    "scenario": "web-disabled",
+    "config": {
+      "webDirect": false
+    },
+    "blocked": false,
+    "input": {
+      "PlaySessionId": "session",
+      "ServerExtension": {
+        "status": "FutureEnum",
+        "nested": [
+          null,
+          {
+            "untouched": true
+          }
+        ]
+      },
+      "MediaSources": [
+        {
+          "Id": "mediasource_1",
+          "ItemId": "1",
+          "Path": "/media/movie.mkv",
+          "Name": "Test movie",
+          "Container": "mkv",
+          "SupportsTranscoding": true,
+          "SupportsDirectPlay": false,
+          "SupportsDirectStream": false,
+          "TranscodeReasons": ["VideoCodecNotSupported"],
+          "TranscodingUrl": "/transcode",
+          "TranscodingContainer": "ts",
+          "TranscodingSubProtocol": "hls",
+          "Protocol": "File",
+          "MediaStreams": [
+            {
+              "Type": "Video",
+              "Codec": "futureCodec",
+              "Extra": {
+                "array": [1, false, null]
+              }
+            }
+          ],
+          "VendorData": {
+            "version": 7,
+            "flags": ["unknown"]
+          }
+        },
+        {
+          "Id": "second",
+          "ItemId": "2",
+          "Path": "/media/second.mkv",
+          "MediaStreams": [
+            {
+              "Type": "Audio",
+              "Codec": "eac3",
+              "IsDefault": true
+            }
+          ],
+          "KeepMe": null
+        }
+      ]
+    },
+    "expected": {
+      "PlaySessionId": "session",
+      "ServerExtension": {
+        "status": "FutureEnum",
+        "nested": [
+          null,
+          {
+            "untouched": true
+          }
+        ]
+      },
+      "MediaSources": [
+        {
+          "Id": "mediasource_1",
+          "ItemId": "1",
+          "Path": "/media/movie.mkv",
+          "Name": "Test movie",
+          "Container": "mkv",
+          "SupportsTranscoding": true,
+          "SupportsDirectPlay": false,
+          "SupportsDirectStream": false,
+          "TranscodeReasons": ["VideoCodecNotSupported"],
+          "TranscodingUrl": "/transcode",
+          "TranscodingContainer": "ts",
+          "TranscodingSubProtocol": "hls",
+          "Protocol": "File",
+          "MediaStreams": [
+            {
+              "Type": "Video",
+              "Codec": "futureCodec",
+              "Extra": {
+                "array": [1, false, null]
+              }
+            }
+          ],
+          "VendorData": {
+            "version": 7,
+            "flags": ["unknown"]
+          }
+        },
+        {
+          "Id": "second",
+          "ItemId": "2",
+          "Path": "/media/second.mkv",
+          "MediaStreams": [
+            {
+              "Type": "Audio",
+              "Codec": "eac3",
+              "IsDefault": true
+            }
+          ],
+          "KeepMe": null
+        }
+      ]
+    }
+  },
+  {
+    "kind": "emby",
+    "scenario": "filter-blocked",
+    "config": {
+      "webDirect": true
+    },
+    "blocked": true,
+    "input": {
+      "PlaySessionId": "session",
+      "ServerExtension": {
+        "status": "FutureEnum",
+        "nested": [
+          null,
+          {
+            "untouched": true
+          }
+        ]
+      },
+      "MediaSources": [
+        {
+          "Id": "mediasource_1",
+          "ItemId": "1",
+          "Path": "/media/movie.mkv",
+          "Name": "Test movie",
+          "Container": "mkv",
+          "SupportsTranscoding": true,
+          "SupportsDirectPlay": false,
+          "SupportsDirectStream": false,
+          "TranscodeReasons": ["VideoCodecNotSupported"],
+          "TranscodingUrl": "/transcode",
+          "TranscodingContainer": "ts",
+          "TranscodingSubProtocol": "hls",
+          "Protocol": "File",
+          "MediaStreams": [
+            {
+              "Type": "Video",
+              "Codec": "futureCodec",
+              "Extra": {
+                "array": [1, false, null]
+              }
+            }
+          ],
+          "VendorData": {
+            "version": 7,
+            "flags": ["unknown"]
+          }
+        },
+        {
+          "Id": "second",
+          "ItemId": "2",
+          "Path": "/media/second.mkv",
+          "MediaStreams": [
+            {
+              "Type": "Audio",
+              "Codec": "eac3",
+              "IsDefault": true
+            }
+          ],
+          "KeepMe": null
+        }
+      ]
+    },
+    "expected": {
+      "PlaySessionId": "session",
+      "ServerExtension": {
+        "status": "FutureEnum",
+        "nested": [
+          null,
+          {
+            "untouched": true
+          }
+        ]
+      },
+      "MediaSources": [
+        {
+          "Id": "mediasource_1",
+          "ItemId": "1",
+          "Path": "/media/movie.mkv",
+          "Name": "Test movie",
+          "Container": "mkv",
+          "SupportsTranscoding": true,
+          "SupportsDirectPlay": false,
+          "SupportsDirectStream": false,
+          "TranscodeReasons": ["VideoCodecNotSupported"],
+          "TranscodingUrl": "/transcode",
+          "TranscodingContainer": "ts",
+          "TranscodingSubProtocol": "hls",
+          "Protocol": "File",
+          "MediaStreams": [
+            {
+              "Type": "Video",
+              "Codec": "futureCodec",
+              "Extra": {
+                "array": [1, false, null]
+              }
+            }
+          ],
+          "VendorData": {
+            "version": 7,
+            "flags": ["unknown"]
+          }
+        },
+        {
+          "Id": "second",
+          "ItemId": "2",
+          "Path": "/media/second.mkv",
+          "MediaStreams": [
+            {
+              "Type": "Audio",
+              "Codec": "eac3",
+              "IsDefault": true
+            }
+          ],
+          "KeepMe": null
+        }
+      ]
+    }
+  },
+  {
+    "kind": "jellyfin",
+    "scenario": "normal",
+    "config": {
+      "webDirect": true,
+      "webDirectLocalFallback": true
+    },
+    "blocked": false,
+    "input": {
+      "PlaySessionId": "session",
+      "ServerExtension": {
+        "status": "FutureEnum",
+        "nested": [
+          null,
+          {
+            "untouched": true
+          }
+        ]
+      },
+      "MediaSources": [
+        {
+          "Id": "abc123",
+          "ItemId": "1",
+          "Path": "/media/movie.mkv",
+          "Name": "Test movie",
+          "Container": "mkv",
+          "SupportsTranscoding": true,
+          "SupportsDirectPlay": false,
+          "SupportsDirectStream": false,
+          "TranscodeReasons": ["VideoCodecNotSupported"],
+          "TranscodingUrl": "/transcode",
+          "TranscodingContainer": "ts",
+          "TranscodingSubProtocol": "hls",
+          "Protocol": "File",
+          "MediaStreams": [
+            {
+              "Type": "Video",
+              "Codec": "futureCodec",
+              "Extra": {
+                "array": [1, false, null]
+              }
+            }
+          ],
+          "VendorData": {
+            "version": 7,
+            "flags": ["unknown"]
+          }
+        },
+        {
+          "Id": "second",
+          "ItemId": "2",
+          "Path": "/media/second.mkv",
+          "MediaStreams": [
+            {
+              "Type": "Audio",
+              "Codec": "eac3",
+              "IsDefault": true
+            }
+          ],
+          "KeepMe": null
+        }
+      ]
+    },
+    "expected": {
+      "PlaySessionId": "session",
+      "ServerExtension": {
+        "status": "FutureEnum",
+        "nested": [
+          null,
+          {
+            "untouched": true
+          }
+        ]
+      },
+      "MediaSources": [
+        {
+          "Id": "abc123",
+          "ItemId": "1",
+          "Path": "http://relay.test/Videos/abc123/stream?MediaSourceId=abc123&Static=true&FakeDirectStream=true",
+          "Name": "Test movie",
+          "Container": "mkv",
+          "SupportsTranscoding": false,
+          "SupportsDirectPlay": true,
+          "SupportsDirectStream": true,
+          "TranscodeReasons": [],
+          "Protocol": "Http",
+          "MediaStreams": [
+            {
+              "Type": "Video",
+              "Codec": "futureCodec",
+              "Extra": {
+                "array": [1, false, null]
+              }
+            }
+          ],
+          "VendorData": {
+            "version": 7,
+            "flags": ["unknown"]
+          },
+          "IsRemote": true,
+          "StreamUrl": "http://relay.test/Videos/abc123/stream?MediaSourceId=abc123&Static=true&FakeDirectStream=true"
+        },
+        {
+          "Id": "second",
+          "ItemId": "2",
+          "Path": "/media/second.mkv",
+          "MediaStreams": [
+            {
+              "Type": "Audio",
+              "Codec": "eac3",
+              "IsDefault": true
+            }
+          ],
+          "KeepMe": null
+        }
+      ]
+    }
+  },
+  {
+    "kind": "jellyfin",
+    "scenario": "web-disabled",
+    "config": {
+      "webDirect": false
+    },
+    "blocked": false,
+    "input": {
+      "PlaySessionId": "session",
+      "ServerExtension": {
+        "status": "FutureEnum",
+        "nested": [
+          null,
+          {
+            "untouched": true
+          }
+        ]
+      },
+      "MediaSources": [
+        {
+          "Id": "abc123",
+          "ItemId": "1",
+          "Path": "/media/movie.mkv",
+          "Name": "Test movie",
+          "Container": "mkv",
+          "SupportsTranscoding": true,
+          "SupportsDirectPlay": false,
+          "SupportsDirectStream": false,
+          "TranscodeReasons": ["VideoCodecNotSupported"],
+          "TranscodingUrl": "/transcode",
+          "TranscodingContainer": "ts",
+          "TranscodingSubProtocol": "hls",
+          "Protocol": "File",
+          "MediaStreams": [
+            {
+              "Type": "Video",
+              "Codec": "futureCodec",
+              "Extra": {
+                "array": [1, false, null]
+              }
+            }
+          ],
+          "VendorData": {
+            "version": 7,
+            "flags": ["unknown"]
+          }
+        },
+        {
+          "Id": "second",
+          "ItemId": "2",
+          "Path": "/media/second.mkv",
+          "MediaStreams": [
+            {
+              "Type": "Audio",
+              "Codec": "eac3",
+              "IsDefault": true
+            }
+          ],
+          "KeepMe": null
+        }
+      ]
+    },
+    "expected": {
+      "PlaySessionId": "session",
+      "ServerExtension": {
+        "status": "FutureEnum",
+        "nested": [
+          null,
+          {
+            "untouched": true
+          }
+        ]
+      },
+      "MediaSources": [
+        {
+          "Id": "abc123",
+          "ItemId": "1",
+          "Path": "/media/movie.mkv",
+          "Name": "Test movie",
+          "Container": "mkv",
+          "SupportsTranscoding": true,
+          "SupportsDirectPlay": false,
+          "SupportsDirectStream": false,
+          "TranscodeReasons": ["VideoCodecNotSupported"],
+          "TranscodingUrl": "/transcode",
+          "TranscodingContainer": "ts",
+          "TranscodingSubProtocol": "hls",
+          "Protocol": "File",
+          "MediaStreams": [
+            {
+              "Type": "Video",
+              "Codec": "futureCodec",
+              "Extra": {
+                "array": [1, false, null]
+              }
+            }
+          ],
+          "VendorData": {
+            "version": 7,
+            "flags": ["unknown"]
+          }
+        },
+        {
+          "Id": "second",
+          "ItemId": "2",
+          "Path": "/media/second.mkv",
+          "MediaStreams": [
+            {
+              "Type": "Audio",
+              "Codec": "eac3",
+              "IsDefault": true
+            }
+          ],
+          "KeepMe": null
+        }
+      ]
+    }
+  },
+  {
+    "kind": "jellyfin",
+    "scenario": "filter-blocked",
+    "config": {
+      "webDirect": true
+    },
+    "blocked": true,
+    "input": {
+      "PlaySessionId": "session",
+      "ServerExtension": {
+        "status": "FutureEnum",
+        "nested": [
+          null,
+          {
+            "untouched": true
+          }
+        ]
+      },
+      "MediaSources": [
+        {
+          "Id": "abc123",
+          "ItemId": "1",
+          "Path": "/media/movie.mkv",
+          "Name": "Test movie",
+          "Container": "mkv",
+          "SupportsTranscoding": true,
+          "SupportsDirectPlay": false,
+          "SupportsDirectStream": false,
+          "TranscodeReasons": ["VideoCodecNotSupported"],
+          "TranscodingUrl": "/transcode",
+          "TranscodingContainer": "ts",
+          "TranscodingSubProtocol": "hls",
+          "Protocol": "File",
+          "MediaStreams": [
+            {
+              "Type": "Video",
+              "Codec": "futureCodec",
+              "Extra": {
+                "array": [1, false, null]
+              }
+            }
+          ],
+          "VendorData": {
+            "version": 7,
+            "flags": ["unknown"]
+          }
+        },
+        {
+          "Id": "second",
+          "ItemId": "2",
+          "Path": "/media/second.mkv",
+          "MediaStreams": [
+            {
+              "Type": "Audio",
+              "Codec": "eac3",
+              "IsDefault": true
+            }
+          ],
+          "KeepMe": null
+        }
+      ]
+    },
+    "expected": {
+      "PlaySessionId": "session",
+      "ServerExtension": {
+        "status": "FutureEnum",
+        "nested": [
+          null,
+          {
+            "untouched": true
+          }
+        ]
+      },
+      "MediaSources": [
+        {
+          "Id": "abc123",
+          "ItemId": "1",
+          "Path": "/media/movie.mkv",
+          "Name": "Test movie",
+          "Container": "mkv",
+          "SupportsTranscoding": true,
+          "SupportsDirectPlay": false,
+          "SupportsDirectStream": false,
+          "TranscodeReasons": ["VideoCodecNotSupported"],
+          "TranscodingUrl": "/transcode",
+          "TranscodingContainer": "ts",
+          "TranscodingSubProtocol": "hls",
+          "Protocol": "File",
+          "MediaStreams": [
+            {
+              "Type": "Video",
+              "Codec": "futureCodec",
+              "Extra": {
+                "array": [1, false, null]
+              }
+            }
+          ],
+          "VendorData": {
+            "version": 7,
+            "flags": ["unknown"]
+          }
+        },
+        {
+          "Id": "second",
+          "ItemId": "2",
+          "Path": "/media/second.mkv",
+          "MediaStreams": [
+            {
+              "Type": "Audio",
+              "Codec": "eac3",
+              "IsDefault": true
+            }
+          ],
+          "KeepMe": null
+        }
+      ]
+    }
+  }
+]

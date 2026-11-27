@@ -1,6 +1,5 @@
-import { describe, it } from "@std/testing/bdd";
-import { expect } from "@std/expect";
-import { FakeTime } from "@std/testing/time";
+import { describe, it, mock, afterEach } from "node:test";
+import assert from "node:assert/strict";
 import {
   calculateMaxAgeMs,
   getCommonDataFromRequest,
@@ -19,7 +18,7 @@ describe("isWebBrowser", () => {
     ];
 
     for (const ua of browsers) {
-      expect(isWebBrowser(ua)).toBe(true);
+      assert.equal(isWebBrowser(ua), true);
     }
   });
 
@@ -32,7 +31,7 @@ describe("isWebBrowser", () => {
     ];
 
     for (const ua of nonBrowsers) {
-      expect(isWebBrowser(ua)).toBe(false);
+      assert.equal(isWebBrowser(ua), false);
     }
   });
 
@@ -45,39 +44,40 @@ describe("isWebBrowser", () => {
     ];
 
     for (const { ua, expected } of edgeCases) {
-      expect(isWebBrowser(ua)).toBe(expected);
+      assert.equal(isWebBrowser(ua), expected);
     }
   });
 });
 
 describe("calculateMaxAgeMs", () => {
+  afterEach(() => mock.timers.reset());
   it("valid future timestamp", () => {
-    using time = new FakeTime();
+    mock.timers.enable({ apis: ["Date"], now: 1_700_000_000_000 });
     const targetMaxAge = 10 * 60 * 1000; // 10 minutes in ms
     let futureTs = Date.now() + targetMaxAge;
-    time.tick(1000); // advance time by 1 second
+    mock.timers.tick(1000); // advance time by 1 second
 
     let maxAge = calculateMaxAgeMs(futureTs);
-    expect(maxAge).toBeLessThan(targetMaxAge);
+    assert.equal(maxAge, targetMaxAge - 1000);
 
     futureTs = Math.floor((Date.now() + targetMaxAge) / 1000); // in seconds
     maxAge = calculateMaxAgeMs(futureTs);
-    expect(maxAge).toBeLessThan(targetMaxAge);
+    assert.equal(maxAge, targetMaxAge);
   });
 
   it("past timestamp returns zero", () => {
-    using time = new FakeTime();
+    mock.timers.enable({ apis: ["Date"], now: 1_700_000_000_000 });
     const pastTs = Date.now() - 1000;
     const maxAge = calculateMaxAgeMs(pastTs);
-    expect(maxAge).toBe(0);
+    assert.equal(maxAge, 0);
   });
 
   it("invalid timestamp returns undefined", () => {
-    expect(calculateMaxAgeMs(null)).toBeUndefined();
-    expect(calculateMaxAgeMs(undefined)).toBeUndefined();
-    expect(calculateMaxAgeMs("")).toBeUndefined();
-    expect(calculateMaxAgeMs("invalid")).toBeUndefined();
-    expect(calculateMaxAgeMs(-1000)).toBeUndefined();
+    assert.equal(calculateMaxAgeMs(null), undefined);
+    assert.equal(calculateMaxAgeMs(undefined), undefined);
+    assert.equal(calculateMaxAgeMs(""), undefined);
+    assert.equal(calculateMaxAgeMs("invalid"), undefined);
+    assert.equal(calculateMaxAgeMs(-1000), undefined);
   });
 });
 
@@ -93,16 +93,16 @@ describe("getCommonDataFromRequest", () => {
       },
     });
     let commonData = getCommonDataFromRequest(req);
-    expect(commonData.url.href).toBe("http://example.com/path?query=1");
-    expect(commonData.ua).toBe("TestAgent");
-    expect(commonData.ip).toBe("192.168.1.1");
-    expect(commonData.origin).toBe("https://forwarded.example.com");
+    assert.equal(commonData.url.href, "http://example.com/path?query=1");
+    assert.equal(commonData.ua, "TestAgent");
+    assert.equal(commonData.ip, "192.168.1.1");
+    assert.equal(commonData.origin, "https://forwarded.example.com");
 
     req = new Request("http://example.com:4433/path?query=1");
     commonData = getCommonDataFromRequest(req);
-    expect(commonData.ua).toBe("");
-    expect(commonData.ip).toBe("");
-    expect(commonData.origin).toBe("http://example.com:4433");
+    assert.equal(commonData.ua, "");
+    assert.equal(commonData.ip, "");
+    assert.equal(commonData.origin, "http://example.com:4433");
   });
 });
 
@@ -112,9 +112,9 @@ describe("getUpstreamJsonHeaders", () => {
       method: "POST",
       headers: {
         "Accept-Encoding": "br, gzip",
-        "Authorization": 'MediaBrowser Token="abc"',
+        Authorization: 'MediaBrowser Token="abc"',
         "Content-Length": "1",
-        "Host": "client.example.com",
+        Host: "client.example.com",
         "User-Agent": "TestAgent",
       },
       body: "x",
@@ -122,12 +122,12 @@ describe("getUpstreamJsonHeaders", () => {
 
     const headers = getUpstreamJsonHeaders(req);
 
-    expect(headers.get("accept")).toBe("application/json");
-    expect(headers.get("accept-encoding")).toBe("identity");
-    expect(headers.get("authorization")).toBe('MediaBrowser Token="abc"');
-    expect(headers.get("user-agent")).toBe("TestAgent");
-    expect(headers.has("content-length")).toBe(false);
-    expect(headers.has("host")).toBe(false);
+    assert.equal(headers.get("accept"), "application/json");
+    assert.equal(headers.get("accept-encoding"), "identity");
+    assert.equal(headers.get("authorization"), 'MediaBrowser Token="abc"');
+    assert.equal(headers.get("user-agent"), "TestAgent");
+    assert.equal(headers.has("content-length"), false);
+    assert.equal(headers.has("host"), false);
   });
 });
 
@@ -139,7 +139,7 @@ describe("readJsonResponse", () => {
       }),
     );
 
-    expect(data.ok).toBe(true);
+    assert.equal(data.ok, true);
   });
 
   it("includes response metadata when parsing fails", async () => {
@@ -155,28 +155,28 @@ describe("readJsonResponse", () => {
       await readJsonResponse(response, "test response");
       throw new Error("Expected readJsonResponse to throw");
     } catch (err: any) {
-      expect(err.message).toContain("test response parse failed");
-      expect(err.message).toContain("status: 200");
-      expect(err.message).toContain("contentType: application/json");
-      expect(err.message).toContain("contentEncoding: gzip");
-      expect(err.message).toContain("bodyPreview: not json");
+      assert.ok(err.message.includes("test response parse failed"));
+      assert.ok(err.message.includes("status: 200"));
+      assert.ok(err.message.includes("contentType: application/json"));
+      assert.ok(err.message.includes("contentEncoding: gzip"));
+      assert.ok(err.message.includes("bodyPreview: not json"));
     }
   });
 });
 
 describe("playbackPositionTicksToSeconds", () => {
   it("basic", () => {
-    expect(playbackPositionTicksToSeconds(10_000_000)).toBe("1");
-    expect(playbackPositionTicksToSeconds(0)).toBe("0");
-    expect(playbackPositionTicksToSeconds(1_359_000)).toBe("0.135");
-    expect(playbackPositionTicksToSeconds(1_354_000)).toBe("0.135");
+    assert.equal(playbackPositionTicksToSeconds(10_000_000), "1");
+    assert.equal(playbackPositionTicksToSeconds(0), "0");
+    assert.equal(playbackPositionTicksToSeconds(1_359_000), "0.135");
+    assert.equal(playbackPositionTicksToSeconds(1_354_000), "0.135");
   });
 
   it("custom fraction digits", () => {
     // 0.0019 seconds = 19,000 ticks
     const ticks = 19000;
-    expect(playbackPositionTicksToSeconds(ticks)).toBe("0.001");
-    expect(playbackPositionTicksToSeconds(ticks, { fractionDigits: 2 })).toBe("0");
-    expect(playbackPositionTicksToSeconds(ticks, { fractionDigits: 4 })).toBe("0.0019");
+    assert.equal(playbackPositionTicksToSeconds(ticks), "0.001");
+    assert.equal(playbackPositionTicksToSeconds(ticks, { fractionDigits: 2 }), "0");
+    assert.equal(playbackPositionTicksToSeconds(ticks, { fractionDigits: 4 }), "0.0019");
   });
 });
