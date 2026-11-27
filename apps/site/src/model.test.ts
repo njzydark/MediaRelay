@@ -1,6 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { advanceElapsed, copyCommand, cycleDuration, dockerCommand, scenarios, stageAt, stages } from "./model.ts";
+import {
+  advanceElapsed,
+  copyCommand,
+  cycleDuration,
+  dockerCommand,
+  elapsedForStage,
+  scenarios,
+  stageAt,
+  stages,
+} from "./model.ts";
 
 describe("playback demonstration", () => {
   it("covers both local media and entries without local video files", () => {
@@ -24,6 +33,9 @@ describe("playback demonstration", () => {
     assert.equal(advanceElapsed(7_950, 100), 50);
     assert.equal(advanceElapsed(3_000, 0), 3_000);
     assert.equal(advanceElapsed(3_000, -100), 3_000);
+    assert.equal(stageAt(elapsedForStage(0)), 0);
+    assert.equal(stageAt(elapsedForStage(1)), 1);
+    assert.equal(stageAt(elapsedForStage(2)), 2);
   });
 
   it("clearly distinguishes control requests, the redirect and direct media traffic", () => {

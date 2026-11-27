@@ -29,6 +29,10 @@ export function stageAt(elapsed: number): 0 | 1 | 2 {
   return position < 2_000 ? 0 : position < 4_600 ? 1 : 2;
 }
 
+export function elapsedForStage(stage: 0 | 1 | 2): number {
+  return stage === 0 ? 0 : stage === 1 ? 2_000 : 4_600;
+}
+
 export function dockerCommand(service: Service): string {
   const variable = service === "emby" ? "EMBY_URL" : "JELLYFIN_URL";
   return [
